@@ -1,5 +1,9 @@
 # JET SET WILLY
 
+**NOTE: Some rando on the internet is porting this to Rust as a fun-time project**
+
+*(this is that fun-time project; the original is [here](https://github.com/fawtytoo/JetSetWilly))*
+
 ## About
 
 Originally written in 1984 by Matthew Smith. This port is based on the original

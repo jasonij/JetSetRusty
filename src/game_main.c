@@ -159,7 +159,7 @@ static int System_GetEvent()
     return 1;
 }
 
-int main()
+int game_main()
 {
     SDL_AudioSpec   want;
     SDL_DisplayMode mode;
