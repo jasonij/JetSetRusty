@@ -1,3 +1,4 @@
+mod cheat;
 mod common;
 mod misc;
 
