@@ -1,3 +1,6 @@
+mod common;
+mod misc;
+
 unsafe extern "C" {
     fn game_main();
 }

@@ -34,7 +34,6 @@ fn main() {
         .file("src/loader.c")
         .file("src/game_main.c")
         .file("src/miner.c")
-        .file("src/misc.c")
         .file("src/robots.c")
         .file("src/rope.c")
         .file("src/title.c")
