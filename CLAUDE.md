@@ -40,6 +40,7 @@ These are declared as `pub static mut` in `common.rs` and written to by both Rus
 | `misc.rs` | 16-color palette, `Timer` struct, viewport/scaling utils |
 | `cheat.rs` | "writetyper" cheat code detection, level selection (1–60) |
 | `die.rs` | Death animation and life-loss sequence |
+| `audio.rs` | Square-wave synth engine — polyphonic music sequencer, 3-channel SFX, stereo panning |
 
 ### Still in C (`src/*.c`)
 

@@ -1,6 +1,8 @@
+mod audio;
 mod cheat;
 mod common;
 mod die;
+// mod loader;
 mod misc;
 mod video;
 
