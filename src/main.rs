@@ -1,5 +1,6 @@
 mod cheat;
 mod common;
+mod die;
 mod misc;
 mod video;
 

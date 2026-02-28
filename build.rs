@@ -26,7 +26,6 @@ fn main() {
         .define("BUILD", build_string.as_str())
         .file("src/audio.c")
         .file("src/codes.c")
-        .file("src/die.c")
         .file("src/game.c")
         .file("src/gameover.c")
         .file("src/levels.c")
