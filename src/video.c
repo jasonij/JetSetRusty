@@ -249,6 +249,7 @@ int Video_TextWidth(char *text)
     return l;
 }
 
+
 int Video_CycleColours()
 {
     int     pos;
@@ -321,24 +322,21 @@ void Video_DrawArrow(int pos, int dir)
     }
 }
 
-void Video_DrawTile(int tile, u8 *what, u8 paper, u8 ink)
-{
-    int     row, bit;
-    int     pos = TILE2PIXEL(tile) + 7;
-    int     pixel;
-    u8      byte;
-    u8      colour[2] = {paper, ink};
+void Video_DrawTile(int tile, u8 *what, u8 paper, u8 ink) {
+  int row, bit;
+  int pos = TILE2PIXEL(tile) + 7;
+  int pixel;
+  u8 byte;
+  u8 colour[2] = {paper, ink};
 
-    for (row = 0; row < 8; row++, pos += WIDTH, what++)
-    {
-        pixel = pos;
-        byte = *what;
-        for (bit = 0; bit < 8; bit++, pixel--, byte >>= 1)
-        {
-            videoPixel[pixel].point = byte & B_LEVEL;
-            Video_SetPixel(pixel, colour[byte & 1]);
-        }
+  for (row = 0; row < 8; row++, pos += WIDTH, what++) {
+    pixel = pos;
+    byte = *what;
+    for (bit = 0; bit < 8; bit++, pixel--, byte >>= 1) {
+      videoPixel[pixel].point = byte & B_LEVEL;
+      Video_SetPixel(pixel, colour[byte & 1]);
     }
+  }
 }
 
 int Video_DrawMiner(int pos, u16 *line, int level)

@@ -36,7 +36,6 @@ fn main() {
         .file("src/robots.c")
         .file("src/rope.c")
         .file("src/title.c")
-        .file("src/video.c")
         .compile("jetsetrusty");
 
     println!("cargo:rustc-link-lib=SDL2");
