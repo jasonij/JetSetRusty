@@ -1,4 +1,5 @@
 use crate::common::{Action, DoNothing, Drawer, Responder, Ticker, WIDTH};
+use std::ptr::addr_of;
 
 // External functions
 unsafe extern "C" {
@@ -57,8 +58,8 @@ unsafe extern "C" fn gameover_drawer() {
             return;
         }
 
-        Video_WriteLarge(7 * 8, 6 * 8, TEXT_GAME.as_ptr());
-        Video_WriteLarge(18 * 8, 6 * 8, TEXT_OVER.as_ptr());
+        Video_WriteLarge(7 * 8, 6 * 8, addr_of!(TEXT_GAME).cast());
+        Video_WriteLarge(18 * 8, 6 * 8, addr_of!(TEXT_OVER).cast());
     }
 }
 
