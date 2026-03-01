@@ -1,7 +1,7 @@
 use crate::common::{Action, DoNothing, Drawer, Responder, Ticker, WIDTH};
 
 // External functions
-extern "C" {
+unsafe extern "C" {
     fn System_Border(index: i32);
     fn Video_PixelFill(pos: i32, size: i32);
     fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8);
@@ -42,63 +42,69 @@ static mut TEXT_OVER: [i8; 18] = [
 ];
 
 unsafe extern "C" fn gameover_drawer() {
-    if BOOT_TICKS <= 96 {
-        Video_DrawSprite(
-            (BOOT_TICKS & 126) * WIDTH + 15 * 8,
-            BOOT_SPRITE.as_ptr(),
-            0x0,
-            0x7,
-        );
-        Video_PixelPaperFill(0, 128 * WIDTH, ((BOOT_TICKS & 12) >> 2) as u8);
-    }
+    unsafe {
+        if BOOT_TICKS <= 96 {
+            Video_DrawSprite(
+                (BOOT_TICKS & 126) * WIDTH + 15 * 8,
+                BOOT_SPRITE.as_ptr(),
+                0x0,
+                0x7,
+            );
+            Video_PixelPaperFill(0, 128 * WIDTH, ((BOOT_TICKS & 12) >> 2) as u8);
+        }
 
-    if BOOT_TICKS < 96 {
-        return;
-    }
+        if BOOT_TICKS < 96 {
+            return;
+        }
 
-    Video_WriteLarge(7 * 8, 6 * 8, TEXT_GAME.as_ptr());
-    Video_WriteLarge(18 * 8, 6 * 8, TEXT_OVER.as_ptr());
+        Video_WriteLarge(7 * 8, 6 * 8, TEXT_GAME.as_ptr());
+        Video_WriteLarge(18 * 8, 6 * 8, TEXT_OVER.as_ptr());
+    }
 }
 
 unsafe extern "C" fn gameover_ticker() {
-    let mut c = BOOT_TICKS >> 2;
+    unsafe {
+        let mut c = BOOT_TICKS >> 2;
 
-    TEXT_GAME[3] = (c & 0x7) as i8;
-    c += 1;
-    TEXT_GAME[7] = (c & 0x7) as i8;
-    c += 1;
-    TEXT_GAME[11] = (c & 0x7) as i8;
-    c += 1;
-    TEXT_GAME[15] = (c & 0x7) as i8;
-    c += 1;
-    TEXT_OVER[3] = (c & 0x7) as i8;
-    c += 1;
-    TEXT_OVER[7] = (c & 0x7) as i8;
-    c += 1;
-    TEXT_OVER[11] = (c & 0x7) as i8;
-    c += 1;
-    TEXT_OVER[15] = (c & 0x7) as i8;
+        TEXT_GAME[3] = (c & 0x7) as i8;
+        c += 1;
+        TEXT_GAME[7] = (c & 0x7) as i8;
+        c += 1;
+        TEXT_GAME[11] = (c & 0x7) as i8;
+        c += 1;
+        TEXT_GAME[15] = (c & 0x7) as i8;
+        c += 1;
+        TEXT_OVER[3] = (c & 0x7) as i8;
+        c += 1;
+        TEXT_OVER[7] = (c & 0x7) as i8;
+        c += 1;
+        TEXT_OVER[11] = (c & 0x7) as i8;
+        c += 1;
+        TEXT_OVER[15] = (c & 0x7) as i8;
 
-    BOOT_TICKS += 1;
+        BOOT_TICKS += 1;
 
-    if BOOT_TICKS < 256 {
-        return;
+        if BOOT_TICKS < 256 {
+            return;
+        }
+
+        Action = Some(Title_Action);
     }
-
-    Action = Some(Title_Action);
 }
 
 unsafe extern "C" fn gameover_init() {
-    System_Border(0x0);
-    Video_PixelFill(0, 128 * WIDTH);
-    Video_DrawSprite(96 * WIDTH + 15 * 8, MINER_SPRITE.as_ptr(), 0x0, 0x7);
-    Video_DrawSprite(112 * WIDTH + 15 * 8, PLINTH_SPRITE.as_ptr(), 0x0, 0x2);
-    BOOT_TICKS = 0;
+    unsafe {
+        System_Border(0x0);
+        Video_PixelFill(0, 128 * WIDTH);
+        Video_DrawSprite(96 * WIDTH + 15 * 8, MINER_SPRITE.as_ptr(), 0x0, 0x7);
+        Video_DrawSprite(112 * WIDTH + 15 * 8, PLINTH_SPRITE.as_ptr(), 0x0, 0x2);
+        BOOT_TICKS = 0;
 
-    Audio_Play(MUS_STOP);
-    Audio_Sfx(SFX_GAMEOVER);
+        Audio_Play(MUS_STOP);
+        Audio_Sfx(SFX_GAMEOVER);
 
-    Ticker = Some(gameover_ticker);
+        Ticker = Some(gameover_ticker);
+    }
 }
 
 #[unsafe(no_mangle)]
