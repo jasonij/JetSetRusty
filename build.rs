@@ -30,7 +30,6 @@ fn main() {
         .define("BUILD", build_string.as_str())
         .file("src/codes.c")
         .file("src/game.c")
-        .file("src/gameover.c")
         .file("src/levels.c")
         .file("src/game_main.c")
         .file("src/miner.c")
