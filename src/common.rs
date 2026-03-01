@@ -87,7 +87,6 @@ unsafe extern "C" {
     pub fn System_SetPixel(x: i32, y: i32);
 
     pub fn Codes_Action();
-    pub fn Loader_Action();
     pub fn Title_Action();
     pub fn Game_Action();
     pub fn Die_Action();

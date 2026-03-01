@@ -10,7 +10,11 @@ fn main() {
         .stdout;
 
     let date = String::from_utf8(date).unwrap().trim().to_string();
-    let build_string = format!("\"1.0.0 {}\"", date);
+    let build_str = format!("1.0.0 {}", date);
+    // Expose BUILD to Rust via env!("BUILD")
+    println!("cargo:rustc-env=BUILD={}", build_str);
+    // Pass it to the C compiler as a string literal
+    let build_string = format!("\"{}\"", build_str);
 
     let mut build = cc::Build::new();
 
@@ -28,7 +32,6 @@ fn main() {
         .file("src/game.c")
         .file("src/gameover.c")
         .file("src/levels.c")
-        .file("src/loader.c")
         .file("src/game_main.c")
         .file("src/miner.c")
         .file("src/robots.c")
