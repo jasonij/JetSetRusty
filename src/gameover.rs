@@ -14,7 +14,7 @@ unsafe extern "C" {
 }
 
 const MUS_STOP: i32 = 0;
-const SFX_GAMEOVER: i32 = 5;
+const SFX_GAMEOVER: i32 = 4;
 
 static PLINTH_SPRITE: [u16; 16] = [
     14316, 30702, 0, 28662, 61431, 61431, 54619, 56251, 54619, 57339, 60791, 61175, 28022, 0,
