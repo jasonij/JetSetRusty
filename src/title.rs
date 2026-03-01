@@ -1,4 +1,4 @@
-use crate::*;
+use crate::common::{HEIGHT, WIDTH};
 
 extern "C" {
     fn Video_PixelFill(pos: i32, size: i32);
@@ -38,26 +38,28 @@ static mut COLOUR_CYCLE: u8 = 0;
 
 static COLOUR_CYCLE_ADJ: [u8; 6] = [1, 2, 3, 4, 5, 1];
 
-unsafe fn game_start() {
-    Video_PixelFill(128 * WIDTH, 64 * WIDTH);
+fn game_start() {
+    unsafe {
+        Video_PixelFill(128 * WIDTH, 64 * WIDTH);
 
-    Game_GameReset();
-    Game_DrawStatus();
+        Game_GameReset();
+        Game_DrawStatus();
 
-    gameLevel = THEBATHROOM;
-    itemCount = Level_ItemCount();
-    Level_RestoreItems();
+        gameLevel = THEBATHROOM;
+        itemCount = Level_ItemCount();
+        Level_RestoreItems();
 
-    Miner_Init();
+        Miner_Init();
 
-    if cheatEnabled != 0 {
-        Robots_DrawCheat();
+        if cheatEnabled != 0 {
+            Robots_DrawCheat();
+        }
+
+        gameMode = GM_NORMAL;
+        gamePaused = 0;
+
+        Game_Action();
     }
-
-    gameMode = GM_NORMAL;
-    gamePaused = 0;
-
-    Game_Action();
 }
 
 unsafe fn do_title_ticker() {
