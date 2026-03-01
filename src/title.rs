@@ -1,5 +1,22 @@
 use crate::*;
 
+extern "C" {
+    fn Video_PixelFill(pos: i32, size: i32);
+    fn Game_GameReset();
+    fn Game_DrawStatus();
+    fn Level_ItemCount() -> i32;
+    fn Level_RestoreItems();
+    fn Miner_Init();
+    fn Robots_DrawCheat();
+    fn Game_Action();
+    fn Video_Write(pos: i32, text: *const i8);
+    fn System_Border(index: i32);
+    fn Video_CycleColours() -> i32;
+    fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
+    fn DoQuit();
+    fn DoNothing();
+}
+
 static TITLE_JSW: [i32; 100] = [
     100, 101, 102, 104, 105, 106, 108, 109, 110, 113, 114, 115, 117, 118, 119, 121, 122, 123, 133,
     136, 141, 145, 149, 154, 165, 168, 169, 170, 173, 177, 178, 179, 181, 182, 183, 186, 197, 200,
