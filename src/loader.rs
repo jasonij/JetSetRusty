@@ -1,5 +1,3 @@
-#![allow(non_snake_case, dead_code)]
-
 use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
 use crate::common::{HEIGHT, WIDTH};
 use crate::video::{Video_PixelPaperFill, Video_TextWidth, Video_Write, Video_WriteLarge};
