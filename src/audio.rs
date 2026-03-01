@@ -170,20 +170,92 @@ pub static mut audioMusicPlaying: i32 = MUS_STOP;
 pub static mut audioPanX: i32 = 0;
 
 static mut AUDIO_CHANNEL: [Channel; NCHANNELS] = [
-    Channel { left: [0, 0, 0],                      right: [0, 0, 0],                      phase: 0, frequency: 0, do_phase: None },
-    Channel { left: [0, 0, 0],                      right: [0, 0, 0],                      phase: 0, frequency: 0, do_phase: None },
-    Channel { left: [0, 0, 0],                      right: [0, 0, 0],                      phase: 0, frequency: 0, do_phase: None },
-    Channel { left: [MUSICVOLUME, -MUSICVOLUME, 0], right: [-MUSICVOLUME, MUSICVOLUME, 0], phase: 0, frequency: 0, do_phase: None },
-    Channel { left: [MUSICVOLUME, -MUSICVOLUME, 0], right: [-MUSICVOLUME, MUSICVOLUME, 0], phase: 0, frequency: 0, do_phase: None },
-    Channel { left: [MUSICVOLUME, -MUSICVOLUME, 0], right: [-MUSICVOLUME, MUSICVOLUME, 0], phase: 0, frequency: 0, do_phase: None },
-    Channel { left: [MUSICVOLUME, -MUSICVOLUME, 0], right: [-MUSICVOLUME, MUSICVOLUME, 0], phase: 0, frequency: 0, do_phase: None },
-    Channel { left: [MUSICVOLUME, -MUSICVOLUME, 0], right: [-MUSICVOLUME, MUSICVOLUME, 0], phase: 0, frequency: 0, do_phase: None },
+    Channel {
+        left: [0, 0, 0],
+        right: [0, 0, 0],
+        phase: 0,
+        frequency: 0,
+        do_phase: None,
+    },
+    Channel {
+        left: [0, 0, 0],
+        right: [0, 0, 0],
+        phase: 0,
+        frequency: 0,
+        do_phase: None,
+    },
+    Channel {
+        left: [0, 0, 0],
+        right: [0, 0, 0],
+        phase: 0,
+        frequency: 0,
+        do_phase: None,
+    },
+    Channel {
+        left: [MUSICVOLUME, -MUSICVOLUME, 0],
+        right: [-MUSICVOLUME, MUSICVOLUME, 0],
+        phase: 0,
+        frequency: 0,
+        do_phase: None,
+    },
+    Channel {
+        left: [MUSICVOLUME, -MUSICVOLUME, 0],
+        right: [-MUSICVOLUME, MUSICVOLUME, 0],
+        phase: 0,
+        frequency: 0,
+        do_phase: None,
+    },
+    Channel {
+        left: [MUSICVOLUME, -MUSICVOLUME, 0],
+        right: [-MUSICVOLUME, MUSICVOLUME, 0],
+        phase: 0,
+        frequency: 0,
+        do_phase: None,
+    },
+    Channel {
+        left: [MUSICVOLUME, -MUSICVOLUME, 0],
+        right: [-MUSICVOLUME, MUSICVOLUME, 0],
+        phase: 0,
+        frequency: 0,
+        do_phase: None,
+    },
+    Channel {
+        left: [MUSICVOLUME, -MUSICVOLUME, 0],
+        right: [-MUSICVOLUME, MUSICVOLUME, 0],
+        phase: 0,
+        frequency: 0,
+        do_phase: None,
+    },
 ];
 
 static mut AUDIO_SFX: [SfxInfo; NSFX] = [
-    SfxInfo { pitch_table: SFX_NONE, pitch_idx: 0, channel: 0, length: 0, clock: 0, do_sfx: None, do_play: None },
-    SfxInfo { pitch_table: SFX_NONE, pitch_idx: 0, channel: 1, length: 0, clock: 0, do_sfx: None, do_play: None },
-    SfxInfo { pitch_table: SFX_NONE, pitch_idx: 0, channel: 2, length: 0, clock: 0, do_sfx: None, do_play: None },
+    SfxInfo {
+        pitch_table: SFX_NONE,
+        pitch_idx: 0,
+        channel: 0,
+        length: 0,
+        clock: 0,
+        do_sfx: None,
+        do_play: None,
+    },
+    SfxInfo {
+        pitch_table: SFX_NONE,
+        pitch_idx: 0,
+        channel: 1,
+        length: 0,
+        clock: 0,
+        do_sfx: None,
+        do_play: None,
+    },
+    SfxInfo {
+        pitch_table: SFX_NONE,
+        pitch_idx: 0,
+        channel: 2,
+        length: 0,
+        clock: 0,
+        do_sfx: None,
+        do_play: None,
+    },
 ];
 
 // Index of the sfx slot being processed by the trampoline functions below.
@@ -202,8 +274,18 @@ static mut musicChannels: usize = 0;
 static mut sfxClock: i32 = 0;
 static mut samplesSfx: i32 = 0;
 
-static mut timerSfx: Timer = Timer { acc: 0, rate: 0, remainder: 0, divisor: 0 };
-static mut timerMusic: Timer = Timer { acc: 0, rate: 0, remainder: 0, divisor: 0 };
+static mut timerSfx: Timer = Timer {
+    acc: 0,
+    rate: 0,
+    remainder: 0,
+    divisor: 0,
+};
+static mut timerMusic: Timer = Timer {
+    acc: 0,
+    rate: 0,
+    remainder: 0,
+    divisor: 0,
+};
 
 // ---- trampoline functions ---------------------------------------------------
 // These have the `unsafe extern "C" fn()` signature required by Event.
@@ -277,7 +359,9 @@ unsafe fn channel_stereo(ch: &mut Channel, left: i32, right: i32) {
 
 unsafe fn channel_pan(ch: &mut Channel, pan: usize) {
     let p = PAN_TABLE[pan];
-    unsafe { channel_stereo(ch, p, 256 - p); }
+    unsafe {
+        channel_stereo(ch, p, 256 - p);
+    }
 }
 
 unsafe fn music_reset() {
@@ -388,9 +472,11 @@ pub extern "C" fn Audio_Output(output: *mut i16) {
 
                         match data & 0xf0 {
                             x if x == EV_NOTEON => {
-                                let note = MUSIC_SCORE[curMusicTable][curMusicIdx] as i32 + musicPitch;
+                                let note =
+                                    MUSIC_SCORE[curMusicTable][curMusicIdx] as i32 + musicPitch;
                                 curMusicIdx += 1;
-                                AUDIO_CHANNEL[MUSIC_CH[ch]].frequency = FREQUENCY_TABLE[note as usize];
+                                AUDIO_CHANNEL[MUSIC_CH[ch]].frequency =
+                                    FREQUENCY_TABLE[note as usize];
                                 AUDIO_CHANNEL[MUSIC_CH[ch]].do_phase = Some(do_phase_fn);
                             }
                             x if x == EV_END => {
