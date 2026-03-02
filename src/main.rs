@@ -5,6 +5,7 @@ mod die;
 mod gameover;
 mod loader;
 mod misc;
+mod rope;
 mod title;
 mod video;
 

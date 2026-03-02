@@ -1,6 +1,6 @@
-use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
+use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
 use crate::cheat::cheatEnabled;
-use crate::common::{gameInput, videoFlash, Action, Drawer, Key, Responder, Ticker, HEIGHT, WIDTH};
+use crate::common::{Action, Drawer, HEIGHT, Key, Responder, Ticker, WIDTH, gameInput, videoFlash};
 use crate::video::TILE2PIXEL;
 use std::ptr::addr_of_mut;
 
