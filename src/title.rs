@@ -4,6 +4,7 @@ use crate::common::{
     gameInput, videoFlash, Action, Ticker, Drawer, Responder, HEIGHT, WIDTH,
 };
 use crate::video::TILE2PIXEL;
+use std::ptr::addr_of_mut;
 
 unsafe extern "C" {
     fn Video_PixelFill(pos: i32, size: i32);
@@ -111,7 +112,7 @@ unsafe extern "C" fn do_title_drawer() {
         if audioMusicPlaying != 0 {
             for i in 0..100 {
                 let tile = TITLE_JSW[i];
-                Video_Write(TILE2PIXEL(tile), TEXT_JSW.as_ptr() as *const i8);
+                Video_Write(TILE2PIXEL(tile), addr_of_mut!(TEXT_JSW) as *const i8);
             }
             return;
         }
