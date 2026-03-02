@@ -28,7 +28,7 @@ unsafe extern "C" {
 }
 
 const MUS_TITLE: i32 = 0;
-const THEBATHROOM: i32 = 0;
+const THEBATHROOM: i32 = 33;
 const GM_NORMAL: i32 = 0;
 
 static TITLE_JSW: [i32; 100] = [
