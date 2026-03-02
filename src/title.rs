@@ -5,7 +5,7 @@ use crate::common::{
 };
 use crate::video::TILE2PIXEL;
 
-extern "C" {
+unsafe extern "C" {
     fn Video_PixelFill(pos: i32, size: i32);
     fn Game_GameReset();
     fn Game_DrawStatus();
@@ -130,93 +130,97 @@ unsafe extern "C" fn do_title_drawer() {
 }
 
 unsafe extern "C" fn do_title_responder() {
-    if gameInput == KEY_ENTER {
-        Action = Some(game_start);
-    } else if gameInput == KEY_ESCAPE {
-        DoQuit();
+    unsafe {
+        if gameInput == KEY_ENTER {
+            Action = Some(game_start);
+        } else if gameInput == KEY_ESCAPE {
+            DoQuit();
+        }
     }
 }
 
 unsafe extern "C" fn do_title_init() {
-    System_Border(0x0);
-    Video_PixelFill(0, WIDTH * HEIGHT);
+    unsafe {
+        System_Border(0x0);
+        Video_PixelFill(0, WIDTH * HEIGHT);
 
-    Video_Write(
-        16 * WIDTH + 144,
-        b"\x01\x00\x02\x05\x10\x11\x12\x13\0".as_ptr() as *const i8,
-    );
-    Video_Write(
-        24 * WIDTH + 128,
-        b"\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14\0".as_ptr() as *const i8,
-    );
-    Video_Write(
-        32 * WIDTH + 112,
-        b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\0".as_ptr()
-            as *const i8,
-    );
-    Video_Write(
-        40 * WIDTH + 96,
-        b"\x01\x00\x02\x05\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x14\x14\0"
-            .as_ptr() as *const i8,
-    );
-    Video_Write(
-        48 * WIDTH + 80,
-        b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\x02\x01\x10\x14\x14\x14\0"
-            .as_ptr() as *const i8,
-    );
-    Video_Write(
-        56 * WIDTH + 64,
-        b"\x01\x00\x02\x05\x14\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x02\x00\x10\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
-            .as_ptr() as *const i8,
-    );
-    Video_Write(
-        64 * WIDTH + 64,
-        b"\x01\x05\x02\x01\x12\x13\x14\x14\x01\x09\x02\x05\x12\x13\x02\x00\x10\x11\x01\x00\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
-            .as_ptr() as *const i8,
-    );
-    Video_Write(
-        72 * WIDTH + 64,
-        b"\x01\x01\x14\x14\x01\x05\x02\x01\x12\x13\x14\x14\x01\x00\x02\x05\x12\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
-            .as_ptr() as *const i8,
-    );
-    Video_Write(
-        80 * WIDTH + 64,
-        b"\x01\x01\x02\x00\x12\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x00\x02\x05\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0"
-            .as_ptr() as *const i8,
-    );
-    Video_Write(
-        88 * WIDTH + 80,
-        b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
-            .as_ptr() as *const i8,
-    );
-    Video_Write(
-        96 * WIDTH + 96,
-        b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0"
-            .as_ptr() as *const i8,
-    );
-    Video_Write(
-        104 * WIDTH + 112,
-        b"\x01\x01\x02\x00\x14\x13\x14\x14\x14\x14\x01\x09\x14\x14\0".as_ptr() as *const i8,
-    );
-    Video_Write(
-        112 * WIDTH + 128,
-        b"\x01\x01\x14\x13\x14\x14\x01\x09\x14\x14\0".as_ptr() as *const i8,
-    );
-    Video_Write(
-        120 * WIDTH + 144,
-        b"\x01\x01\x12\x13\x01\x09\x10\x11\0".as_ptr() as *const i8,
-    );
+        Video_Write(
+            16 * WIDTH + 144,
+            b"\x01\x00\x02\x05\x10\x11\x12\x13\0".as_ptr() as *const i8,
+        );
+        Video_Write(
+            24 * WIDTH + 128,
+            b"\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14\0".as_ptr() as *const i8,
+        );
+        Video_Write(
+            32 * WIDTH + 112,
+            b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\0".as_ptr()
+                as *const i8,
+        );
+        Video_Write(
+            40 * WIDTH + 96,
+            b"\x01\x00\x02\x05\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x14\x14\0"
+                .as_ptr() as *const i8,
+        );
+        Video_Write(
+            48 * WIDTH + 80,
+            b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\x02\x01\x10\x14\x14\x14\0"
+                .as_ptr() as *const i8,
+        );
+        Video_Write(
+            56 * WIDTH + 64,
+            b"\x01\x00\x02\x05\x14\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x02\x00\x10\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
+                .as_ptr() as *const i8,
+        );
+        Video_Write(
+            64 * WIDTH + 64,
+            b"\x01\x05\x02\x01\x12\x13\x14\x14\x01\x09\x02\x05\x12\x13\x02\x00\x10\x11\x01\x00\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
+                .as_ptr() as *const i8,
+        );
+        Video_Write(
+            72 * WIDTH + 64,
+            b"\x01\x01\x14\x14\x01\x05\x02\x01\x12\x13\x14\x14\x01\x00\x02\x05\x12\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
+                .as_ptr() as *const i8,
+        );
+        Video_Write(
+            80 * WIDTH + 64,
+            b"\x01\x01\x02\x00\x12\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x00\x02\x05\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0"
+                .as_ptr() as *const i8,
+        );
+        Video_Write(
+            88 * WIDTH + 80,
+            b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
+                .as_ptr() as *const i8,
+        );
+        Video_Write(
+            96 * WIDTH + 96,
+            b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0"
+                .as_ptr() as *const i8,
+        );
+        Video_Write(
+            104 * WIDTH + 112,
+            b"\x01\x01\x02\x00\x14\x13\x14\x14\x14\x14\x01\x09\x14\x14\0".as_ptr() as *const i8,
+        );
+        Video_Write(
+            112 * WIDTH + 128,
+            b"\x01\x01\x14\x13\x14\x14\x01\x09\x14\x14\0".as_ptr() as *const i8,
+        );
+        Video_Write(
+            120 * WIDTH + 144,
+            b"\x01\x01\x12\x13\x01\x09\x10\x11\0".as_ptr() as *const i8,
+        );
 
-    Video_WriteLarge(0, 0, b"\x01\x00\x02\x04\0".as_ptr() as *const i8);
-    Video_WriteLarge(0, 19 * 8, TEXT_TICKER.as_ptr() as *const i8);
+        Video_WriteLarge(0, 0, b"\x01\x00\x02\x04\0".as_ptr() as *const i8);
+        Video_WriteLarge(0, 19 * 8, TEXT_TICKER.as_ptr() as *const i8);
 
-    TEXT_POS = 0;
-    TEXT_FRAME = -1;
-    COLOUR_CYCLE = 1;
+        TEXT_POS = 0;
+        TEXT_FRAME = -1;
+        COLOUR_CYCLE = 1;
 
-    Audio_Music(MUS_TITLE, MUS_PLAY);
+        Audio_Music(MUS_TITLE, MUS_PLAY);
 
         Ticker = Some(do_title_ticker);
+    }
 }
 
 #[unsafe(no_mangle)]
