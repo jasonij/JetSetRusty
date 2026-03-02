@@ -1,7 +1,7 @@
 use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
 use crate::cheat::cheatEnabled;
 use crate::common::{
-    gameInput, videoFlash, Action, Ticker, Drawer, Responder, HEIGHT, WIDTH,
+    gameInput, videoFlash, Action, Ticker, Drawer, Responder, HEIGHT, WIDTH, Key,
 };
 use crate::video::TILE2PIXEL;
 use std::ptr::addr_of_mut;
@@ -30,8 +30,6 @@ unsafe extern "C" {
 const MUS_TITLE: i32 = 0;
 const THEBATHROOM: i32 = 0;
 const GM_NORMAL: i32 = 0;
-const KEY_ENTER: i32 = 13;
-const KEY_ESCAPE: i32 = 27;
 
 static TITLE_JSW: [i32; 100] = [
     100, 101, 102, 104, 105, 106, 108, 109, 110, 113, 114, 115, 117, 118, 119, 121, 122, 123, 133,
@@ -132,9 +130,9 @@ unsafe extern "C" fn do_title_drawer() {
 
 unsafe extern "C" fn do_title_responder() {
     unsafe {
-        if gameInput == KEY_ENTER {
+        if gameInput == Key::Enter as i32 {
             Action = Some(game_start);
-        } else if gameInput == KEY_ESCAPE {
+        } else if gameInput == Key::Escape as i32 {
             DoQuit();
         }
     }
