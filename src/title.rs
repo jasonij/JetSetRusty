@@ -1,7 +1,10 @@
-use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
+use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY, MUS_TITLE};
 use crate::cheat::cheatEnabled;
-// use crate::common::{gameInput, videoFlash, Action, Ticker, HEIGHT, WIDTH};
-use crate::common::{gameInput, videoFlash, HEIGHT, WIDTH};
+use crate::common::{
+    gameInput, videoFlash, Action, Ticker, Drawer, Responder, HEIGHT, WIDTH,
+    gameLevel, itemCount, gameMode, gamePaused, GM_NORMAL, THEBATHROOM,
+    KEY_ENTER, KEY_ESCAPE,
+};
 use crate::video::TILE2PIXEL;
 
 unsafe extern "C" {
@@ -94,24 +97,26 @@ unsafe fn do_title_ticker() {
 }
 
 unsafe fn do_title_drawer() {
-    if audioMusicPlaying != 0 {
-        for i in 0..100 {
-            let tile = TITLE_JSW[i];
-            Video_Write(TILE2PIXEL(tile), TEXT_JSW.as_ptr() as *const i8);
+    unsafe {
+        if audioMusicPlaying != 0 {
+            for i in 0..100 {
+                let tile = TITLE_JSW[i];
+                Video_Write(TILE2PIXEL(tile), TEXT_JSW.as_ptr() as *const i8);
+            }
+            return;
         }
-        return;
-    }
 
-    if COLOUR_CYCLE == 1 {
-        System_Border(Video_CycleColours());
-    }
+        if COLOUR_CYCLE == 1 {
+            System_Border(Video_CycleColours());
+        }
 
-    Video_WriteLarge(0, 0, b"\x01\x01\x02\x07\0".as_ptr() as *const i8);
-    Video_WriteLarge(
-        -(TEXT_FRAME & 6),
-        19 * 8,
-        TEXT_TICKER.as_ptr().add(TEXT_POS as usize) as *const i8,
-    );
+        Video_WriteLarge(0, 0, b"\x01\x01\x02\x07\0".as_ptr() as *const i8);
+        Video_WriteLarge(
+            -(TEXT_FRAME & 6),
+            19 * 8,
+            TEXT_TICKER.as_ptr().add(TEXT_POS as usize) as *const i8,
+        );
+    }
 }
 
 unsafe fn do_title_responder() {
@@ -207,9 +212,9 @@ unsafe fn do_title_init() {
 #[unsafe(no_mangle)]
 pub extern "C" fn Title_Action() {
     unsafe {
-        let Responder = Some(do_title_responder);
-        let Ticker = Some(do_title_init);
-        let Drawer = Some(do_title_drawer);
-        let Action = Some(DoNothing);
+        Responder = Some(do_title_responder);
+        Ticker = Some(do_title_init);
+        Drawer = Some(do_title_drawer);
+        Action = Some(DoNothing);
     }
 }
