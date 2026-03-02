@@ -1,9 +1,10 @@
 use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
 use crate::cheat::cheatEnabled;
-use crate::common::{Action, gameInput, HEIGHT, Ticker, videoFlash, WIDTH};
+// use crate::common::{gameInput, videoFlash, Action, Ticker, HEIGHT, WIDTH};
+use crate::common::{gameInput, videoFlash, HEIGHT, WIDTH};
 use crate::video::TILE2PIXEL;
 
-extern "C" {
+unsafe extern "C" {
     fn Video_PixelFill(pos: i32, size: i32);
     fn Game_GameReset();
     fn Game_DrawStatus();
@@ -29,7 +30,7 @@ static TITLE_JSW: [i32; 100] = [
     464, 466, 467, 468, 471,
 ];
 
-static mut TEXT_JSW: [u8; 6] = [b'\x01', b'\x02', b'\x02', b'\x0b', b'\x14', 0];
+static TEXT_JSW: &[u8] = &[b'\x01', b'\x02', b'\x02', b'\x0b', b'\x14', 0];
 
 static TEXT_TICKER: &[u8] = b"      Press ENTER to Start                                JET-SET WILLY by Matthew Smith   1984 SOFTWARE PROJECTS Ltd                                Guide Willy to collect all the items around the house before Midnight so Maria will let you get to your bed                                Press ENTER to Start      \0";
 
