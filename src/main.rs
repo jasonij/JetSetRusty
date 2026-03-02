@@ -5,6 +5,7 @@ mod die;
 mod gameover;
 mod loader;
 mod misc;
+mod title;
 mod video;
 
 unsafe extern "C" {
