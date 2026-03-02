@@ -1,13 +1,11 @@
-use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY, MUS_TITLE};
+use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
 use crate::cheat::cheatEnabled;
 use crate::common::{
     gameInput, videoFlash, Action, Ticker, Drawer, Responder, HEIGHT, WIDTH,
-    gameLevel, itemCount, gameMode, gamePaused, GM_NORMAL, THEBATHROOM,
-    KEY_ENTER, KEY_ESCAPE,
 };
 use crate::video::TILE2PIXEL;
 
-unsafe extern "C" {
+extern "C" {
     fn Video_PixelFill(pos: i32, size: i32);
     fn Game_GameReset();
     fn Game_DrawStatus();
@@ -22,7 +20,17 @@ unsafe extern "C" {
     fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
     fn DoQuit();
     fn DoNothing();
+    static mut gameLevel: i32;
+    static mut itemCount: i32;
+    static mut gameMode: i32;
+    static mut gamePaused: i32;
 }
+
+const MUS_TITLE: i32 = 0;
+const THEBATHROOM: i32 = 0;
+const GM_NORMAL: i32 = 0;
+const KEY_ENTER: i32 = 13;
+const KEY_ESCAPE: i32 = 27;
 
 static TITLE_JSW: [i32; 100] = [
     100, 101, 102, 104, 105, 106, 108, 109, 110, 113, 114, 115, 117, 118, 119, 121, 122, 123, 133,
@@ -33,7 +41,7 @@ static TITLE_JSW: [i32; 100] = [
     464, 466, 467, 468, 471,
 ];
 
-static TEXT_JSW: &[u8] = &[b'\x01', b'\x02', b'\x02', b'\x0b', b'\x14', 0];
+static mut TEXT_JSW: [u8; 6] = [b'\x01', b'\x02', b'\x02', b'\x0b', b'\x14', 0];
 
 static TEXT_TICKER: &[u8] = b"      Press ENTER to Start                                JET-SET WILLY by Matthew Smith   1984 SOFTWARE PROJECTS Ltd                                Guide Willy to collect all the items around the house before Midnight so Maria will let you get to your bed                                Press ENTER to Start      \0";
 
@@ -45,7 +53,7 @@ static mut COLOUR_CYCLE: u8 = 0;
 
 static COLOUR_CYCLE_ADJ: [u8; 6] = [1, 2, 3, 4, 5, 1];
 
-fn game_start() {
+unsafe extern "C" fn game_start() {
     unsafe {
         Video_PixelFill(128 * WIDTH, 64 * WIDTH);
 
@@ -69,34 +77,36 @@ fn game_start() {
     }
 }
 
-unsafe fn do_title_ticker() {
-    if audioMusicPlaying != 0 {
-        if videoFlash != 0 {
-            TEXT_JSW[1] = b'\x0b';
-            TEXT_JSW[3] = b'\x02';
-        } else {
-            TEXT_JSW[1] = b'\x02';
-            TEXT_JSW[3] = b'\x0b';
-        }
-        return;
-    }
-
-    COLOUR_CYCLE = COLOUR_CYCLE_ADJ[COLOUR_CYCLE as usize];
-
-    if TEXT_POS < TEXT_END {
-        if TEXT_FRAME < 6 {
-            TEXT_FRAME += 2;
+unsafe extern "C" fn do_title_ticker() {
+    unsafe {
+        if audioMusicPlaying != 0 {
+            if videoFlash != 0 {
+                TEXT_JSW[1] = b'\x0b';
+                TEXT_JSW[3] = b'\x02';
+            } else {
+                TEXT_JSW[1] = b'\x02';
+                TEXT_JSW[3] = b'\x0b';
+            }
             return;
         }
-        TEXT_POS += 1;
-        TEXT_FRAME = 0;
-        return;
-    }
 
-    Action = Some(Title_Action);
+        COLOUR_CYCLE = COLOUR_CYCLE_ADJ[COLOUR_CYCLE as usize];
+
+        if TEXT_POS < TEXT_END {
+            if TEXT_FRAME < 6 {
+                TEXT_FRAME += 2;
+                return;
+            }
+            TEXT_POS += 1;
+            TEXT_FRAME = 0;
+            return;
+        }
+
+        Action = Some(Title_Action);
+    }
 }
 
-unsafe fn do_title_drawer() {
+unsafe extern "C" fn do_title_drawer() {
     unsafe {
         if audioMusicPlaying != 0 {
             for i in 0..100 {
@@ -119,7 +129,7 @@ unsafe fn do_title_drawer() {
     }
 }
 
-unsafe fn do_title_responder() {
+unsafe extern "C" fn do_title_responder() {
     if gameInput == KEY_ENTER {
         Action = Some(game_start);
     } else if gameInput == KEY_ESCAPE {
@@ -127,7 +137,7 @@ unsafe fn do_title_responder() {
     }
 }
 
-unsafe fn do_title_init() {
+unsafe extern "C" fn do_title_init() {
     System_Border(0x0);
     Video_PixelFill(0, WIDTH * HEIGHT);
 
@@ -206,7 +216,7 @@ unsafe fn do_title_init() {
 
     Audio_Music(MUS_TITLE, MUS_PLAY);
 
-    Ticker = Some(do_title_ticker);
+        Ticker = Some(do_title_ticker);
 }
 
 #[unsafe(no_mangle)]
