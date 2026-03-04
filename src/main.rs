@@ -3,6 +3,7 @@ mod cheat;
 mod common;
 mod die;
 mod gameover;
+mod levels;
 mod loader;
 mod misc;
 mod rope;

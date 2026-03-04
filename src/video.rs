@@ -388,15 +388,13 @@ pub extern "C" fn Video_DrawArrow(mut pos: i32, dir: i32) {
     }
 }
 
-// levels.c
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawTile(tile: i32, what: *const u8, paper: u8, ink: u8) {
+pub fn Video_DrawTile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
     let mut pos = TILE2PIXEL(tile) + 7;
     let colour = [paper, ink];
     unsafe {
         for row in 0..8 {
             let mut pixel = pos;
-            let mut byte = *what.add(row);
+            let mut byte = what[row];
             for _ in 0..8 {
                 videoPixel[pixel as usize].point = byte & B_LEVEL;
                 Video_SetPixel(pixel, colour[(byte & 1) as usize]);

@@ -1,6 +1,7 @@
-use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
+use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
 use crate::cheat::cheatEnabled;
-use crate::common::{Action, Drawer, HEIGHT, Key, Responder, Ticker, WIDTH, gameInput, videoFlash};
+use crate::common::{gameInput, videoFlash, Action, Drawer, Key, Responder, Ticker, HEIGHT, WIDTH};
+use crate::levels::{Level_ItemCount, Level_RestoreItems};
 use crate::video::TILE2PIXEL;
 use std::ptr::addr_of_mut;
 
@@ -8,8 +9,6 @@ unsafe extern "C" {
     fn Video_PixelFill(pos: i32, size: i32);
     fn Game_GameReset();
     fn Game_DrawStatus();
-    fn Level_ItemCount() -> i32;
-    fn Level_RestoreItems();
     fn Miner_Init();
     fn Robots_DrawCheat();
     fn Game_Action();

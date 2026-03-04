@@ -1,4 +1,4 @@
-use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
+use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
 use crate::common::{HEIGHT, WIDTH};
 use crate::video::{Video_PixelPaperFill, Video_TextWidth, Video_Write, Video_WriteLarge};
 
@@ -82,7 +82,7 @@ extern "C" fn do_loader_drawer1() {
         System_Border(0x1);
         Video_PixelPaperFill(0, WIDTH * HEIGHT, 0x1);
 
-        // "fawtytoo" — the faux copyright line (paper=1, ink=7)
+        // "fawtytoo" (paper=1, ink=7)
         Video_Write(
             23 * 8 * WIDTH,
             b"\x01\x01\x02\x07fawtytoo\0".as_ptr() as *const i8,

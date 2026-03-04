@@ -183,16 +183,18 @@ unsafe extern "C" {
 }
 
 // Must match the MinerWilly struct layout in game.h exactly
+// levels.rs is using this
 #[repr(C)]
-struct MinerWilly {
+pub struct MinerWilly {
     x: i32,
     y: i32,
-    frame: i32,
     tile: i32,
     align: i32,
-    r#move: i32,
+    frame: i32,
     dir: i32,
-    air: i32,
+    r#move: i32,
+    pub air: i32,
+    pub jump: i32,
 }
 
 // Level constants — verified against game.h, these are the rope rooms

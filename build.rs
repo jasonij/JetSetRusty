@@ -26,15 +26,14 @@ fn main() {
         build.include(path);
     }
 
+    // pants
     build
         .define("BUILD", build_string.as_str())
         .file("src/codes.c")
         .file("src/game.c")
-        .file("src/levels.c")
         .file("src/game_main.c")
         .file("src/miner.c")
         .file("src/robots.c")
-        .file("src/rope.c")
         .compile("jetsetrusty");
 
     println!("cargo:rustc-link-lib=SDL2");

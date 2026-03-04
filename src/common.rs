@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use crate::levels;
+
 // Screen dimensions
 pub const WIDTH: i32 = 256;
 pub const HEIGHT: i32 = 192;
@@ -81,14 +83,18 @@ unsafe extern "C" {
     // Forward declarations of C functions not yet ported
     pub fn DoNothing();
     pub fn DoQuit();
-    pub fn System_Border(x: i32);
     pub fn System_Rnd() -> i32;
     pub fn System_IsKey(key: i32) -> i32;
     pub fn System_SetPixel(x: i32, y: i32);
-
     pub fn Codes_Action();
     pub fn Title_Action();
     pub fn Game_Action();
     pub fn Die_Action();
     pub fn Gameover_Action();
+}
+
+// trying a thin wrapper approach to see if we like this
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn Level_SetBorder() {
+    levels::level_set_border();
 }
