@@ -78,23 +78,14 @@ pub enum Key {
     None,
 }
 
-// Global state — these are extern in C, defined somewhere in the C codebase
-// For now we declare them here and they'll be provided by the remaining C modules
+// Globals defined in game_main.rs, re-exported here for convenience
+pub use crate::game_main::{
+    Action, Drawer, Responder, Ticker, gameInput, videoFlash,
+    DoNothing, DoQuit, System_Rnd, System_SetPixel,
+};
+
+// Forward declarations of remaining C functions
 unsafe extern "C" {
-    pub static mut Action: Event;
-    pub static mut Responder: Event;
-    pub static mut Ticker: Event;
-    pub static mut Drawer: Event;
-
-    pub static mut gameInput: i32;
-    pub static mut videoFlash: i32;
-
-    // Forward declarations of C functions not yet ported
-    pub fn DoNothing();
-    pub fn DoQuit();
-    pub fn System_Rnd() -> i32;
-    pub fn System_IsKey(key: i32) -> i32;
-    pub fn System_SetPixel(pos: i32, ink: i32);
     pub fn Codes_Action();
     pub fn Title_Action();
     pub fn Game_Action();
@@ -102,14 +93,11 @@ unsafe extern "C" {
     pub fn Gameover_Action();
 }
 
-// trying a thin wrapper approach to see if we like this
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn Level_SetBorder() {
     levels::level_set_border();
 }
 
 pub fn system_set_pixel(pos: i32, ink: i32) {
-    unsafe {
-        System_SetPixel(pos, ink);
-    }
+    unsafe { System_SetPixel(pos, ink) }
 }

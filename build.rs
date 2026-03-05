@@ -30,7 +30,6 @@ fn main() {
     build
         .define("BUILD", build_string.as_str())
         .file("src/game.c")
-        .file("src/game_main.c")
         .file("src/miner.c")
         .file("src/robots.c")
         .compile("jetsetrusty");

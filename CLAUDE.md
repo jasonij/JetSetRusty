@@ -44,12 +44,15 @@ These are declared as `pub static mut` globals in C (`game_main.c`) and referenc
 | `title.rs` | Title screen — JSW logo, scrolling ticker, starts music |
 | `gameover.rs` | Game over animation — boot kicks Willy, then returns to title |
 | `loader.rs` | Loading screen — flashing text, loading bar, copy protection flow |
+| `levels.rs` | Level data and room layout definitions |
+| `rope.rs` | Rope swing physics and rendering |
+| `codes.rs` | Copy-protection code entry and validation |
 
 ### Still in C (compiled via `build.rs`)
 
-`game_main.c`, `game.c`, `miner.c`, `robots.c`, `levels.c`, `rope.c`, `codes.c`
+`game_main.c`, `game.c`, `miner.c`, `robots.c`
 
-Note: `src/title.c` exists on disk (the original before porting) but is **not compiled**.
+Note: `src/title.c`, `src/levels.c`, `src/rope.c`, and `src/codes.c` exist on disk (originals before porting) but are **not compiled**.
 
 ### FFI Conventions
 

@@ -3,6 +3,7 @@ mod cheat;
 mod codes;
 mod common;
 mod die;
+mod game_main;
 mod gameover;
 mod levels;
 mod loader;
@@ -11,12 +12,6 @@ mod rope;
 mod title;
 mod video;
 
-unsafe extern "C" {
-    fn game_main();
-}
-
 fn main() {
-    unsafe {
-        game_main();
-    }
+    game_main::run();
 }
