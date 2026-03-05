@@ -32,7 +32,7 @@ const SFX_NONE: usize = 5;
 // musicChannel[i] maps to audioChannel index
 const MUSIC_CH: [usize; NMUSIC] = [3, 4, 5, 6, 7];
 
-type Event = Option<unsafe extern "C" fn()>;
+use crate::common::Event;
 
 // ---- structs ----------------------------------------------------------------
 
@@ -163,9 +163,8 @@ static SFX_PITCH: [&[i32]; 6] = [
 
 // ---- mutable globals --------------------------------------------------------
 
-// Exported to C
-#[unsafe(no_mangle)]
 pub static mut audioMusicPlaying: i32 = MUS_STOP;
+
 #[unsafe(no_mangle)]
 pub static mut audioPanX: i32 = 0;
 
@@ -293,6 +292,7 @@ static mut timerMusic: Timer = Timer {
 
 // Sentinel: stored in Channel.do_phase to mark channel as "on".
 // The actual oscillator logic is inlined in Audio_Output's mixing loop.
+
 unsafe extern "C" fn do_phase_fn() {}
 
 unsafe extern "C" fn sfx_off_trampoline() {

@@ -1,6 +1,6 @@
 #![allow(non_snake_case, dead_code, non_upper_case_globals)]
 
-use crate::common::WIDTH;
+use crate::common::{MinerWilly, WIDTH};
 use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
 
 unsafe extern "C" {
@@ -32,12 +32,6 @@ enum Sfx {
     Arrow,
     Willy,
     None,
-}
-
-#[repr(C)]
-struct MinerWilly {
-    x: i32,
-    // other fields we don't care about yet
 }
 
 static dieBlank: [u16; 16] = [0; 16];

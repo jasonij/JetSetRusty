@@ -1,10 +1,10 @@
 use crate::common::{Action, DoNothing, Drawer, Responder, Ticker, WIDTH};
+use crate::video::video_pixel_fill;
 use std::ptr::addr_of;
 
 // External functions
 unsafe extern "C" {
     fn System_Border(index: i32);
-    fn Video_PixelFill(pos: i32, size: i32);
     fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8);
     fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
     fn Video_PixelPaperFill(pos: i32, size: i32, ink: u8);
@@ -46,12 +46,12 @@ unsafe extern "C" fn gameover_drawer() {
     unsafe {
         if BOOT_TICKS <= 96 {
             Video_DrawSprite(
-                (BOOT_TICKS & 126) * WIDTH + 15 * 8,
+                (BOOT_TICKS & 126) * WIDTH as i32 + 15 * 8,
                 BOOT_SPRITE.as_ptr(),
                 0x0,
                 0x7,
             );
-            Video_PixelPaperFill(0, 128 * WIDTH, ((BOOT_TICKS & 12) >> 2) as u8);
+            Video_PixelPaperFill(0, 128 * WIDTH as i32, ((BOOT_TICKS & 12) >> 2) as u8);
         }
 
         if BOOT_TICKS < 96 {
@@ -96,7 +96,7 @@ unsafe extern "C" fn gameover_ticker() {
 unsafe extern "C" fn gameover_init() {
     unsafe {
         System_Border(0x0);
-        Video_PixelFill(0, 128 * WIDTH);
+        video_pixel_fill(0, 128 * WIDTH);
         Video_DrawSprite(96 * WIDTH + 15 * 8, MINER_SPRITE.as_ptr(), 0x0, 0x7);
         Video_DrawSprite(112 * WIDTH + 15 * 8, PLINTH_SPRITE.as_ptr(), 0x0, 0x2);
         BOOT_TICKS = 0;

@@ -1,6 +1,8 @@
-#![allow(non_snake_case, dead_code, non_upper_case_globals)]
+#![allow(unused)]
 
-use crate::common::{HEIGHT, WIDTH};
+use crate::common::{system_set_pixel, HEIGHT, WIDTH};
+
+use std::sync::{LazyLock, Mutex};
 
 unsafe extern "C" {
     pub fn System_SetPixel(point: i32, index: i32);
@@ -13,44 +15,31 @@ const B_LEVEL: u8 = 1;
 const B_ROBOT: u8 = 2;
 const B_WILLY: u8 = 4;
 
+pub const CHAR_WIDTH: usize = 8; // width of a character in pixels
+pub const CHAR_HEIGHT: usize = 8;
+pub const CHAR_HEIGHT_LARGE: usize = CHAR_HEIGHT * 2;
+
 #[inline]
-pub const fn TILE2PIXEL(t: i32) -> i32 {
+pub const fn tile_2_pixel(t: i32) -> i32 {
     ((t & 992) << 6) | ((t & 31) << 3)
 }
 
 #[inline]
-pub const fn YALIGN(y: i32) -> i32 {
+pub const fn yalign(y: i32) -> i32 {
     4 | ((y & 4) >> 1) | (y & 2) | ((y & 1) << 1)
 }
 
-// We want to respect the original C types
-//
-// void Video_Write(int, char *);
-// void Video_WriteLarge(int, int, char *);
-// void Video_DrawSprite(int, u16 *, u8, u8);
-// void Video_DrawRobot(int, u16 *, u8);
-// int Video_DrawMiner(int, u16 *, int);
-// void Video_DrawTile(int, u8 *, u8, u8);
-// void Video_DrawArrow(int, int);
-// void Video_DrawRopeSeg(int, u8);
-// void Video_PixelFill(int, int);
-// void Video_PixelInkFill(int, int, u8);
-// void Video_PixelPaperFill(int, int, u8);
-// int Video_CycleColours(void);
-// int Video_TextWidth(char *);
-// int Video_GetPixel(int);
-//
-///////////////
-
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct Pixel {
+pub struct Pixel {
     ink: u8,
     point: u8,
 }
 
-static mut videoPixel: [Pixel; (WIDTH * HEIGHT) as usize] =
-    [Pixel { ink: 0, point: 0 }; (WIDTH * HEIGHT) as usize];
+pub static VIDEO_PIXEL: LazyLock<Mutex<Vec<Pixel>>> =
+    LazyLock::new(|| Mutex::new(vec![Pixel { ink: 0, point: 0 }; (WIDTH * HEIGHT) as usize]));
+
+static TEXT_INK: Mutex<[u8; 2]> = Mutex::new([0, 0]);
 
 static CHAR_SET: [[u8; 10]; 128] = [
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -282,273 +271,322 @@ static CHAR_SET_LARGE: [[u16; 8]; 96] = [
     [2032, 3096, 6604, 4644, 4644, 6476, 3096, 2032],
 ];
 
-static mut textInk: [u8; 2] = [0x0, 0x0];
-
-// rope.c calls this
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_GetPixel(pos: i32) -> i32 {
-    unsafe { videoPixel[pos as usize] }.point as i32
+fn video_set_pixel(pixels: &mut Vec<Pixel>, pos: i32, ink: u8) {
+    pixels[pos as usize].ink = ink;
+    system_set_pixel(pos, ink as i32);
 }
 
-fn Video_SetPixel(pos: i32, ink: u8) {
-    unsafe {
-        videoPixel[pos as usize].ink = ink;
-        System_SetPixel(pos, ink as i32);
-    }
+pub fn video_get_pixel(pixels: &mut Vec<Pixel>, pos: i32) -> i32 {
+    pixels[pos as usize].point as i32
 }
 
-// levels.c and loader.c
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_TextWidth(text: *const i8) -> i32 {
-    let mut l = 0i32;
-    let mut p = text;
-    while unsafe { *p } != 0 {
-        l += CHAR_SET[(unsafe { *p } as u8) as usize][0] as i32;
-        unsafe {
-            p = p.add(1);
-        }
-    }
-    l
+pub fn video_text_width(text: *const i8) -> i32 {
+    let text = unsafe { std::ffi::CStr::from_ptr(text) }.to_bytes();
+    text.iter().map(|&ch| CHAR_SET[ch as usize][0] as i32).sum()
 }
 
 // game.c and title.c
 #[unsafe(no_mangle)]
 pub extern "C" fn Video_CycleColours() -> i32 {
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+
     for pos in 0..(WIDTH * HEIGHT) as usize {
-        Video_SetPixel(
-            pos as i32,
-            ((unsafe { videoPixel[pos] }.ink + 3) & 0xf) as u8,
-        );
+        let ink = (pixels[pos].ink + 3) & 0xf;
+        video_set_pixel(&mut pixels, pos as i32, ink);
     }
-    unsafe { videoPixel[0] }.ink as i32
+    pixels[0].ink as i32
 }
 
-// gameover.c, die.c, game.c, loader.c
+// gameover.c, game.c
 #[unsafe(no_mangle)]
-pub extern "C" fn Video_PixelPaperFill(mut pos: i32, mut size: i32, ink: u8) {
+pub extern "C" fn Video_PixelPaperFill(pos: i32, size: i32, ink: u8) {
+    let mut pos = pos;
+    let mut size = size;
+
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+
     while size > 0 {
-        if (Video_GetPixel(pos) & 1) == 0 {
-            Video_SetPixel(pos, ink);
+        if (video_get_pixel(&mut pixels, pos) & 1) == 0 {
+            video_set_pixel(&mut pixels, pos, ink);
         }
         size -= 1;
         pos += 1;
     }
 }
 
-// game.c and die.c
+// game.c is still using this
 #[unsafe(no_mangle)]
 pub extern "C" fn Video_PixelInkFill(mut pos: i32, mut size: i32, ink: u8) {
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     while size > 0 {
-        if Video_GetPixel(pos) & 1 != 0 {
-            Video_SetPixel(pos, ink);
+        if video_get_pixel(&mut pixels, pos) & 1 != 0 {
+            video_set_pixel(&mut pixels, pos, ink);
         }
         size -= 1;
         pos += 1;
     }
 }
 
-// title.c, gameover.c, codes.c, levels.c
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_PixelFill(mut pos: i32, mut size: i32) {
+pub fn video_pixel_fill(pos: i32, size: i32) {
+    let mut pos = pos;
+    let mut size = size;
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     while size > 0 {
-        unsafe { videoPixel[pos as usize] }.point = 0;
-        Video_SetPixel(pos, 0x0);
+        pixels[pos as usize].point = 0;
+        video_set_pixel(&mut pixels, pos, 0x0);
         size -= 1;
         pos += 1;
     }
 }
 
-// rope.c
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawRopeSeg(pos: i32, ink: u8) {
-    unsafe { videoPixel[pos as usize] }.point = 1;
-    Video_SetPixel(pos, ink);
+pub fn video_draw_rope_seg(pos: i32, ink: u8) {
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+
+    pixels[pos as usize].point = 1;
+    video_set_pixel(&mut pixels, pos, ink);
 }
 
 // robots.c
 #[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawArrow(mut pos: i32, dir: i32) {
-    pos += dir;
-    unsafe {
-        videoPixel[pos as usize].point |= B_ROBOT | 1;
-        Video_SetPixel(pos, 7);
-        videoPixel[(pos + 6) as usize].point |= B_ROBOT | 1;
-        Video_SetPixel(pos + 6, 7);
-        pos += WIDTH;
-        videoPixel[(pos + WIDTH) as usize].point |= B_ROBOT | 1;
-        Video_SetPixel(pos + WIDTH, 7);
-        videoPixel[(pos + WIDTH + 6) as usize].point |= B_ROBOT | 1;
-        Video_SetPixel(pos + WIDTH + 6, 7);
-        pos -= dir;
-        for _ in 0..8 {
-            videoPixel[pos as usize].point |= B_ROBOT | 1;
-            Video_SetPixel(pos, 7);
-            pos += 1;
-        }
+pub extern "C" fn Video_DrawArrow(pos: i32, dir: i32) {
+    let width = WIDTH;
+    let mut pos = pos + dir;
+
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+
+    pixels[pos as usize].point |= B_ROBOT | 1;
+    video_set_pixel(&mut pixels, pos, 7);
+    pixels[(pos + 6) as usize].point |= B_ROBOT | 1;
+    video_set_pixel(&mut pixels, pos + 6, 7);
+    pos += width;
+    pixels[(pos + width) as usize].point |= B_ROBOT | 1;
+    video_set_pixel(&mut pixels, pos + width, 7);
+    pixels[(pos + width + 6) as usize].point |= B_ROBOT | 1;
+    video_set_pixel(&mut pixels, pos + width + 6, 7);
+    pos -= dir;
+    for _ in 0..8 {
+        pixels[pos as usize].point |= B_ROBOT | 1;
+        video_set_pixel(&mut pixels, pos, 7);
+        pos += 1;
     }
 }
 
-pub fn Video_DrawTile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
-    let mut pos = TILE2PIXEL(tile) + 7;
+pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
+    let mut pos = tile_2_pixel(tile) + 7;
     let colour = [paper, ink];
-    unsafe {
-        for row in 0..8 {
-            let mut pixel = pos;
-            let mut byte = what[row];
-            for _ in 0..8 {
-                videoPixel[pixel as usize].point = byte & B_LEVEL;
-                Video_SetPixel(pixel, colour[(byte & 1) as usize]);
-                pixel -= 1;
-                byte >>= 1;
-            }
-            pos += WIDTH;
+
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+
+    for row in 0..8 {
+        let mut pixel = pos;
+        let mut byte = what[row];
+        for _ in 0..8 {
+            pixels[pixel as usize].point = byte & B_LEVEL;
+            video_set_pixel(&mut pixels, pixel, colour[(byte & 1) as usize]);
+            pixel -= 1;
+            byte >>= 1;
         }
+        pos += WIDTH;
     }
 }
 
+// miner.c still needs this
 #[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawMiner(mut pos: i32, line: *const u16, level: i32) -> i32 {
+pub extern "C" fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32 {
+    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // TODO: fix after miner.c
+
     let attr = [0x8i32, 0x8, 0x8, 0x1];
     let mut die = 0i32;
 
-    pos &= !7;
+    let mut pos = pos & !7;
     let mut y = pos / WIDTH;
     pos += 15;
 
-    unsafe {
-        for row in 0..16 {
-            let mut pixel = pos;
-            let mut word = *line.add(row);
-            let ink = attr[(y >> level) as usize];
-            for _ in 0..16 {
-                if word & 1 != 0 {
-                    if Video_GetPixel(pixel) & B_ROBOT as i32 != 0 {
-                        die = 1;
-                    }
-                    videoPixel[pixel as usize].point |= B_WILLY | 1;
-                    Video_SetPixel(pixel, ink as u8);
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+
+    for row in 0..16 {
+        let mut pixel = pos;
+        let mut word = line[row];
+        let ink = attr[(y >> level) as usize];
+        for _ in 0..16 {
+            if word & 1 != 0 {
+                if video_get_pixel(&mut pixels, pixel) & B_ROBOT as i32 != 0 {
+                    die = 1;
                 }
-                pixel -= 1;
-                word >>= 1;
+                pixels[pixel as usize].point |= B_WILLY | 1;
+                video_set_pixel(&mut pixels, pixel, ink as u8);
             }
-            pos += WIDTH;
-            y += 1;
+            pixel -= 1;
+            word >>= 1;
         }
+        pos += WIDTH;
+        y += 1;
     }
 
     die
 }
 
+// robots.c needs this
 #[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawRobot(mut pos: i32, line: *const u16, ink: u8) {
-    pos += 15;
-    unsafe {
-        for row in 0..16 {
-            let mut pixel = pos;
-            let mut word = *line.add(row);
-            for _ in 0..16 {
-                if word & 1 != 0 {
-                    videoPixel[pixel as usize].point |= B_ROBOT | 1;
-                    Video_SetPixel(pixel, ink);
-                }
-                pixel -= 1;
-                word >>= 1;
+pub extern "C" fn Video_DrawRobot(pos: i32, line: *const u16, ink: u8) {
+    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // TODO: fix after robots.c
+    let mut pos = pos + 15;
+
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+
+    for row in 0..16 {
+        let mut pixel = pos;
+        let mut word = line[row];
+        for _ in 0..16 {
+            if word & 1 != 0 {
+                pixels[pixel as usize].point |= B_ROBOT | 1;
+                video_set_pixel(&mut pixels, pixel, ink);
             }
-            pos += WIDTH;
+            pixel -= 1;
+            word >>= 1;
         }
+        pos += WIDTH;
     }
 }
 
+pub fn video_draw_robot(pos: i32, line: [i32; 16], ink: u8) {
+    Video_DrawRobot(pos, line.as_ptr() as *const u16, ink);
+}
+
 #[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawSprite(mut pos: i32, line: *const u16, paper: u8, ink: u8) {
+pub extern "C" fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8) {
+    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // TODO: fix after robots.c
     let colour = [paper, ink];
-    pos += 15;
-    unsafe {
-        for row in 0..16 {
-            let mut pixel = pos;
-            let mut word = *line.add(row);
-            for _ in 0..16 {
-                videoPixel[pixel as usize].point = (word & 1) as u8;
-                Video_SetPixel(pixel, colour[(word & 1) as usize]);
-                pixel -= 1;
-                word >>= 1;
-            }
-            pos += WIDTH;
+    let mut pos = pos + 15;
+
+    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+
+    for row in 0..16 {
+        let mut pixel = pos;
+        let mut word = line[row];
+        for _ in 0..16 {
+            pixels[pixel as usize].point = (word & 1) as u8;
+            video_set_pixel(&mut pixels, pixel, colour[(word & 1) as usize]);
+            pixel -= 1;
+            word >>= 1;
         }
+        pos += WIDTH;
     }
 }
 
-fn TextCode(text: *const i8) -> i32 {
-    unsafe {
-        match *text as u8 {
-            0x1 => {
-                textInk[0] = *text.add(1) as u8;
-                1
-            }
-            0x2 => {
-                textInk[1] = *text.add(1) as u8;
-                1
-            }
-            _ => 0,
+fn text_code(text: &[u8], ink: &mut [u8; 2]) -> bool {
+    match text[0] {
+        0x1 => {
+            ink[0] = text[1];
+            true
         }
+        0x2 => {
+            ink[1] = text[1];
+            true
+        }
+        _ => false,
     }
 }
 
+pub fn video_write_large(x: i32, y: i32, text: *const i8) {
+    Video_WriteLarge(x, y, text);
+}
+
+// used by game.c
 #[unsafe(no_mangle)]
-pub extern "C" fn Video_WriteLarge(mut x: i32, y: i32, text: *const i8) {
+pub extern "C" fn Video_WriteLarge(x: i32, y: i32, text: *const i8) {
+    let mut x = x;
     let pos = y * WIDTH;
-    unsafe {
-        let mut p = text;
-        while *p != 0 {
-            if TextCode(p) != 0 {
-                p = p.add(1);
-                p = p.add(1);
-                continue;
-            }
-            let ch = (*p as u8 - b' ') as usize;
-            let byte = CHAR_SET_LARGE[ch].as_ptr();
-            for col in 0..8 {
-                if x >= 0 && x < WIDTH {
-                    let mut pixel = pos + x;
-                    let mut line = *byte.add(col);
-                    for _ in 0..16 {
-                        Video_SetPixel(pixel, textInk[(line & 1) as usize]);
-                        pixel += WIDTH;
-                        line >>= 1;
-                    }
-                }
-                x += 1;
-            }
-            p = p.add(1);
-        }
-    }
-}
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_Write(mut pos: i32, text: *const i8) {
-    unsafe {
-        let mut p = text;
-        while *p != 0 {
-            if TextCode(p) != 0 {
-                p = p.add(1);
-                p = p.add(1);
-                continue;
-            }
-            let ch = *p as u8 as usize;
-            let row = &CHAR_SET[ch];
-            let width = row[0] as usize;
-            for col in 1..=width {
-                let mut pixel = pos;
-                let mut line = row[col];
-                for _ in 0..8 {
-                    videoPixel[pixel as usize].point = line & 1;
-                    Video_SetPixel(pixel, textInk[(line & 1) as usize]);
+    let text = unsafe {
+        let len = find_string_end(text as *const u8);
+        std::slice::from_raw_parts(text as *const u8, len)
+    };
+
+    // WARN: Locks!
+    let mut pixels = VIDEO_PIXEL.lock().unwrap();
+    let mut ink = TEXT_INK.lock().unwrap();
+
+    let mut i = 0;
+    while i < text.len() {
+        if text_code(&text[i..], &mut ink) {
+            i += 2; // two-byte jump
+            continue;
+        }
+
+        let ch = (text[i] - b' ') as usize; // Space is the offset for start of alphabet
+        let byte = &CHAR_SET_LARGE[ch];
+        for col in 0..CHAR_WIDTH {
+            if x >= 0 && x < WIDTH {
+                let mut pixel = pos + x;
+                let mut line = byte[col];
+                for _ in 0..CHAR_HEIGHT_LARGE {
+                    let bit = (line & 1) as usize;
+                    video_set_pixel(&mut pixels, pixel, ink[bit]);
                     pixel += WIDTH;
                     line >>= 1;
                 }
-                pos += 1;
             }
-            p = p.add(1);
+            x += 1;
         }
+        i += 1;
+    }
+}
+
+pub fn video_write(pos: i32, text: *const i8) {
+    Video_Write(pos, text);
+}
+
+fn find_string_end(mut p: *const u8) -> usize {
+    unsafe {
+        let start = p;
+        while *p != 0 {
+            if *p == 0x1 || *p == 0x2 {
+                p = p.add(2); // skip control + data byte
+            } else {
+                p = p.add(1);
+            }
+        }
+        p.offset_from(start) as usize
+    }
+}
+
+// game.c
+#[unsafe(no_mangle)]
+pub extern "C" fn Video_Write(pos: i32, text: *const i8) {
+    let text = unsafe {
+        let len = find_string_end(text as *const u8);
+        std::slice::from_raw_parts(text as *const u8, len)
+    };
+
+    // WARN: Locks
+    let mut pixels = VIDEO_PIXEL.lock().unwrap();
+    let mut ink = TEXT_INK.lock().unwrap();
+
+    let mut pos = pos;
+    let mut i = 0;
+
+    while i < text.len() {
+        if text_code(&text[i..], &mut ink) {
+            i += 2; // In this case we have to jump 2 bytes
+            continue;
+        }
+
+        let ch = text[i] as usize;
+        let row = &CHAR_SET[ch];
+        let width = row[0] as usize;
+        for col in 1..=width {
+            let mut pixel = pos;
+            let mut line = row[col];
+            for _ in 0..CHAR_HEIGHT {
+                let bit = (line & 1) as usize;
+                pixels[pixel as usize].point = bit as u8;
+                video_set_pixel(&mut pixels, pixel, ink[bit]);
+                pixel += WIDTH;
+                line >>= 1;
+            }
+            pos += 1;
+        }
+        i += 1;
     }
 }

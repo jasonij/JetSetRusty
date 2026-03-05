@@ -1,6 +1,6 @@
 use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
 use crate::common::{HEIGHT, WIDTH};
-use crate::video::{Video_PixelPaperFill, Video_TextWidth, Video_Write, Video_WriteLarge};
+use crate::video::{video_text_width, Video_PixelPaperFill, Video_Write, Video_WriteLarge};
 
 unsafe extern "C" {
     static mut Action: Option<unsafe extern "C" fn()>;
@@ -93,7 +93,7 @@ extern "C" fn do_loader_drawer1() {
         let build = concat!(env!("BUILD"), "\0").as_bytes();
         let build_with_ink = concat!("\x02\x00", env!("BUILD"), "\0").as_bytes();
         Video_Write(
-            23 * 8 * WIDTH + WIDTH - Video_TextWidth(build.as_ptr() as *const i8),
+            23 * 8 * WIDTH + WIDTH - video_text_width(build.as_ptr() as *const i8),
             build_with_ink.as_ptr() as *const i8,
         );
 

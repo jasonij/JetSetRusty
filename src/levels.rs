@@ -1,8 +1,5 @@
-#![allow(non_snake_case, dead_code)]
-
-use crate::common::{videoFlash, WIDTH};
-use crate::rope::MinerWilly;
-use crate::video::{Video_DrawTile, Video_PixelFill, Video_TextWidth, Video_Write};
+use crate::common::{videoFlash, MinerWilly, WIDTH};
+use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
 
 unsafe extern "C" {
     fn System_Border(colour_index: i32); // We'll honour the pondish spelling
@@ -10,9 +7,9 @@ unsafe extern "C" {
     static mut minerWilly: MinerWilly;
 }
 
-const LEVEL_WIDTH: usize = 32;
+const LEVEL_W: usize = 32;
 const LEVEL_HEIGHT: usize = 16;
-const LEVEL_TILES: usize = LEVEL_WIDTH * LEVEL_HEIGHT; // 32 * 16 is 512
+const LEVEL_TILES: usize = LEVEL_W * LEVEL_HEIGHT; // 32 * 16 is 512
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
@@ -46,12 +43,6 @@ struct LevelData {
     pub info: [LevelInfo; 10],
     pub item_count: i32,
     pub item: [i32; 12],
-}
-
-impl LevelData {
-    pub fn item_count(&self) -> i32 {
-        self.item.iter().filter(|x| **x != 0).count() as i32
-    }
 }
 
 static LEVEL_DATA: [LevelData; 60] = [
@@ -4998,7 +4989,7 @@ pub unsafe extern "C" fn Level_RestoreItems() {
 }
 
 fn do_tile(cell: usize, tile: &Tile) {
-    Video_DrawTile(cell as i32, tile.gfx, tile.paper[2], tile.ink[2]);
+    video_draw_tile(cell as i32, tile.gfx, tile.paper[2], tile.ink[2]);
 }
 
 fn do_item(tile: &mut Tile) {
@@ -5082,17 +5073,11 @@ fn level_ticker() {
     }
 }
 
+// game.c
+#[allow(non_snake_case)]
 #[unsafe(no_mangle)]
 pub fn Level_Ticker() {
     level_ticker()
-}
-
-fn draw_tile(cell: usize, tile: &mut Tile) {
-    match tile.draw_mode {
-        DrawMode::Tile => do_tile(cell, tile),
-        DrawMode::Item => do_item(tile),
-        DrawMode::Flash => do_flash(tile),
-    }
 }
 
 fn level_drawer() {
@@ -5157,15 +5142,15 @@ fn level_init() {
         CONVEY_ROTATE[1] = 2 - dir;
     }
 
-    Video_PixelFill(129 * WIDTH, 8 * WIDTH);
+    video_pixel_fill(129 * WIDTH, 8 * WIDTH);
 
-    // TODO: "\x1\x0\x2\x6" contains a null byte - verify what Video_Write expects here,
+    // TODO: "\x1\x0\x2\x6" contains a null byte - verify what video_write expects here,
     // this may be a length-prefixed or special control sequence rather than a C string.
-    Video_Write(0, b"\x01\x00\x02\x06\x00".as_ptr() as *const i8);
+    video_write(0, b"\x01\x00\x02\x06\x00".as_ptr() as *const i8);
 
     let title = std::ffi::CString::new(level.title).unwrap();
-    let title_width = Video_TextWidth(title.as_ptr());
-    Video_Write(
+    let title_width = video_text_width(title.as_ptr());
+    video_write(
         (16 * 8 + 1) * WIDTH + (WIDTH - title_width) / 2,
         title.as_ptr(),
     );

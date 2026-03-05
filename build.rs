@@ -29,7 +29,6 @@ fn main() {
     // pants
     build
         .define("BUILD", build_string.as_str())
-        .file("src/codes.c")
         .file("src/game.c")
         .file("src/game_main.c")
         .file("src/miner.c")

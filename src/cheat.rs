@@ -1,4 +1,4 @@
-use crate::common::{Action, Event, Key};
+use crate::common::{Action, Event, Key, MinerWilly};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // These will move to game.rs when we port that
@@ -10,20 +10,6 @@ unsafe extern "C" {
     fn Game_InitRoom();
     fn Game_CheatEnabled();
     fn System_IsKey(key: i32) -> i32;
-}
-
-// Temporary until we port game.rs
-#[repr(C)]
-pub struct MinerWilly {
-    pub x: i32,
-    pub y: i32,
-    pub tile: i32,
-    pub align: i32,
-    pub frame: i32,
-    pub dir: i32,
-    pub move_: i32, // 'move' is a Rust keyword so we suffix with _
-    pub air: i32,
-    pub jump: i32,
 }
 
 const FIRSTLANDING: i32 = 28;
@@ -80,7 +66,6 @@ pub extern "C" fn Cheat_Enabled() {
     }
 }
 
-// #[unsafe(no_mangle)]
 pub extern "C" fn cheat_disabled() {
     static CHEAT_POS: AtomicUsize = AtomicUsize::new(0);
 

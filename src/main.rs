@@ -1,5 +1,6 @@
 mod audio;
 mod cheat;
+mod codes;
 mod common;
 mod die;
 mod gameover;

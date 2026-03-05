@@ -2,11 +2,10 @@ use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
 use crate::cheat::cheatEnabled;
 use crate::common::{gameInput, videoFlash, Action, Drawer, Key, Responder, Ticker, HEIGHT, WIDTH};
 use crate::levels::{Level_ItemCount, Level_RestoreItems};
-use crate::video::TILE2PIXEL;
+use crate::video::{tile_2_pixel, video_pixel_fill};
 use std::ptr::addr_of_mut;
 
 unsafe extern "C" {
-    fn Video_PixelFill(pos: i32, size: i32);
     fn Game_GameReset();
     fn Game_DrawStatus();
     fn Miner_Init();
@@ -51,7 +50,7 @@ static COLOUR_CYCLE_ADJ: [u8; 6] = [1, 2, 3, 4, 5, 1];
 
 unsafe extern "C" fn game_start() {
     unsafe {
-        Video_PixelFill(128 * WIDTH, 64 * WIDTH);
+        video_pixel_fill(128 * WIDTH, 64 * WIDTH);
 
         Game_GameReset();
         Game_DrawStatus();
@@ -107,7 +106,7 @@ unsafe extern "C" fn do_title_drawer() {
         if audioMusicPlaying != 0 {
             for i in 0..100 {
                 let tile = TITLE_JSW[i];
-                Video_Write(TILE2PIXEL(tile), addr_of_mut!(TEXT_JSW) as *const i8);
+                Video_Write(tile_2_pixel(tile), addr_of_mut!(TEXT_JSW) as *const i8);
             }
             return;
         }
@@ -138,7 +137,7 @@ unsafe extern "C" fn do_title_responder() {
 unsafe extern "C" fn do_title_init() {
     unsafe {
         System_Border(0x0);
-        Video_PixelFill(0, WIDTH * HEIGHT);
+        video_pixel_fill(0, WIDTH * HEIGHT);
 
         Video_Write(
             16 * WIDTH + 144,

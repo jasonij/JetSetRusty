@@ -14,7 +14,8 @@
 /// although we'll have to see how this shakes out once everything has been
 /// ported over and we get to remove all the C FFI code.
 ///
-use crate::common::WIDTH;
+use crate::common::{MinerWilly, WIDTH};
+use crate::video::{video_draw_rope_seg, video_get_pixel, VIDEO_PIXEL};
 use std::cell::Cell;
 
 const ROPE_SEGS: i32 = 33;
@@ -171,30 +172,12 @@ pub static mut Rope_Drawer: Option<unsafe extern "C" fn()> = None;
 // ----------------------------------------------------------------------------
 
 unsafe extern "C" {
-    fn Video_DrawRopeSeg(pos: i32, ink: u8);
-    fn Video_GetPixel(pos: i32) -> u32;
-
     static mut minerWillyRope: i32;
     static mut minerWilly: MinerWilly;
 
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
     fn DoNothing();
-}
-
-// Must match the MinerWilly struct layout in game.h exactly
-// levels.rs is using this
-#[repr(C)]
-pub struct MinerWilly {
-    x: i32,
-    y: i32,
-    tile: i32,
-    align: i32,
-    frame: i32,
-    dir: i32,
-    r#move: i32,
-    pub air: i32,
-    pub jump: i32,
 }
 
 // Level constants — verified against game.h, these are the rope rooms
@@ -216,7 +199,7 @@ const COLDSTORE: i32 = 25; // p <return>
 const SWIMMINGPOOL: i32 = 31; // @ <return>
 const THEBEACH: i32 = 57; // R <return>
 
-const B_WILLY: u32 = 4; // video.h
+const B_WILLY: i32 = 4; // video.h
 const R_ABOVE: i32 = 0; // game.h
 
 #[inline]
@@ -235,14 +218,13 @@ fn do_rope_drawer() {
     let mut x = rope_get!(x) * 8;
     let mut y: i32 = 0;
 
-    unsafe {
-        Video_DrawRopeSeg(x, ink);
-    }
+    video_draw_rope_seg(x, ink);
 
     if rope_get!(pos) == 0 {
         rope_set!(side, rope_get!(side) ^ 1);
     }
 
+    let mut pixels = VIDEO_PIXEL.lock().unwrap();
     for seg in 1..ROPE_SEGS {
         let data = &ROPE_DATA[data_idx];
         y += data.y;
@@ -252,7 +234,7 @@ fn do_rope_drawer() {
         let pos = y * WIDTH + x;
 
         unsafe {
-            if minerWillyRope == 0 && (Video_GetPixel(pos) & B_WILLY) != 0 {
+            if minerWillyRope == 0 && (video_get_pixel(&mut pixels, pos) & B_WILLY) != 0 {
                 minerWillyRope = seg;
                 rope_set!(hold, 1);
             }
@@ -278,7 +260,7 @@ fn do_rope_drawer() {
                 minerWilly.align = yalign(y); // y before deduction
             }
 
-            Video_DrawRopeSeg(pos, ink);
+            video_draw_rope_seg(pos, ink);
         }
     }
 
