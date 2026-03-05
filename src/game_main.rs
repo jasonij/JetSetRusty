@@ -3,6 +3,8 @@
 use crate::common::{Event, Key, HEIGHT, WIDTH};
 use crate::misc::{videoColour, Timer, Timer_Set, Timer_Update, Video_Viewport};
 use sdl2::sys as sdl;
+use std::cell::Cell;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 
 const SAMPLERATE: i32 = 22050;
 const TICKRATE: i32 = 60;
@@ -72,70 +74,71 @@ pub static mut gameInput: i32 = Key::None as i32;
 #[unsafe(no_mangle)]
 pub static mut videoFlash: i32 = 0;
 
-// ---- Module-private SDL state -----------------------------------------------
+// ---- Module-private state ---------------------------------------------------
 
-static mut SDL_WINDOW: *mut sdl::SDL_Window = std::ptr::null_mut();
-static mut SDL_RENDERER: *mut sdl::SDL_Renderer = std::ptr::null_mut();
-static mut SDL_TEXTURE: *mut sdl::SDL_Texture = std::ptr::null_mut();
-static mut SDL_TARGET: *mut sdl::SDL_Texture = std::ptr::null_mut();
-static mut SDL_SURFACE: *mut sdl::SDL_Surface = std::ptr::null_mut();
-static mut SDL_VIEWPORT: sdl::SDL_Rect = sdl::SDL_Rect { x: 0, y: 0, w: 0, h: 0 };
-static mut SDL_AUDIO: sdl::SDL_AudioDeviceID = 0;
-static mut KEY_STATE: *const u8 = std::ptr::null();
-static mut BORDER_INDEX: usize = 0;
-static mut GAME_RUNNING: bool = true;
+// SDL surface and key state are raw pointers needed by exported functions, but
+// only ever accessed on the main thread — thread_local Cell avoids static mut.
+thread_local! {
+    static SDL_SURFACE: Cell<*mut sdl::SDL_Surface> = const { Cell::new(std::ptr::null_mut()) };
+    static KEY_STATE:   Cell<*const u8>              = const { Cell::new(std::ptr::null()) };
+}
+
+static BORDER_INDEX: AtomicUsize = AtomicUsize::new(0);
+static GAME_RUNNING: AtomicBool  = AtomicBool::new(true);
 
 // ---- Exported C-facing functions --------------------------------------------
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn DoNothing() {}
+pub extern "C" fn DoNothing() {}
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn DoQuit() {
+pub extern "C" fn DoQuit() {
+    GAME_RUNNING.store(false, Relaxed);
+    // Setting these to None is equivalent to DoNothing — fire() is a no-op on None.
     unsafe {
-        GAME_RUNNING = false;
-        *(&raw mut Drawer) = Some(DoNothing);
-        *(&raw mut Ticker) = Some(DoNothing);
+        *(&raw mut Drawer) = None;
+        *(&raw mut Ticker) = None;
     }
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn System_Rnd() -> i32 {
+pub extern "C" fn System_Rnd() -> i32 {
     unsafe { rand() }
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn System_IsKey(key: i32) -> i32 {
+pub extern "C" fn System_IsKey(key: i32) -> i32 {
+    let key_state = KEY_STATE.with(Cell::get);
     unsafe {
         let scancode = sdl::SDL_GetScancodeFromKey(SDL_KEYS[key as usize]);
-        *KEY_STATE.add(scancode as usize) as i32
+        *key_state.add(scancode as usize) as i32
     }
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn System_SetPixel(pos: i32, index: i32) {
+pub extern "C" fn System_SetPixel(pos: i32, index: i32) {
+    let surface_ptr = SDL_SURFACE.with(Cell::get);
     unsafe {
-        let surface = &*SDL_SURFACE;
+        let surface = &*surface_ptr;
         let pixels = surface.pixels as *mut u8;
         let bpp = (*surface.format).BytesPerPixel as i32;
         let offset = (pos / WIDTH) * surface.pitch + (pos & 255) * bpp;
         let pixel = pixels.add(offset as usize);
         let c = &videoColour[index as usize];
-        *pixel = c.b;
+        *pixel        = c.b;
         *pixel.add(1) = c.g;
         *pixel.add(2) = c.r;
     }
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn System_Border(index: i32) {
-    unsafe {
-        BORDER_INDEX = index as usize;
-    }
+pub extern "C" fn System_Border(index: i32) {
+    BORDER_INDEX.store(index as usize, Relaxed);
 }
 
 // ---- Private SDL helpers ----------------------------------------------------
 
+// Must be `unsafe extern "C"` — that is the required signature for SDL_AudioCallback.
 unsafe extern "C" fn sdl_audio_callback(
     _userdata: *mut core::ffi::c_void,
     stream: *mut u8,
@@ -149,7 +152,7 @@ unsafe extern "C" fn sdl_audio_callback(
     }
 }
 
-// Fire an Event (call its function pointer if present).
+// Call an Event's function pointer if it is set.
 fn fire(event: Event) {
     if let Some(f) = event {
         unsafe { f() };
@@ -211,121 +214,143 @@ fn system_get_event() -> bool {
 // ---- Entry point ------------------------------------------------------------
 
 pub fn run() {
-    unsafe {
-        sdl::SDL_Init(sdl::SDL_INIT_VIDEO | sdl::SDL_INIT_AUDIO);
-        sdl::SDL_SetHint(c"SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS".as_ptr(), c"0".as_ptr());
+    // SDL init ----------------------------------------------------------------
+    unsafe { sdl::SDL_Init(sdl::SDL_INIT_VIDEO | sdl::SDL_INIT_AUDIO) };
+    unsafe { sdl::SDL_SetHint(c"SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS".as_ptr(), c"0".as_ptr()) };
 
-        let mut mode: sdl::SDL_DisplayMode = std::mem::zeroed();
-        sdl::SDL_GetDesktopDisplayMode(0, &raw mut mode);
+    let mut mode = sdl::SDL_DisplayMode {
+        format: 0,
+        w: 0,
+        h: 0,
+        refresh_rate: 0,
+        driverdata: std::ptr::null_mut(),
+    };
+    unsafe { sdl::SDL_GetDesktopDisplayMode(0, &raw mut mode) };
 
-        let multiply = Video_Viewport(
-            mode.w,
-            mode.h,
-            &raw mut SDL_VIEWPORT.x,
-            &raw mut SDL_VIEWPORT.y,
-            &raw mut SDL_VIEWPORT.w,
-            &raw mut SDL_VIEWPORT.h,
-        );
+    let (mut vx, mut vy, mut vw, mut vh) = (0i32, 0i32, 0i32, 0i32);
+    let multiply = Video_Viewport(mode.w, mode.h, &raw mut vx, &raw mut vy, &raw mut vw, &raw mut vh);
+    let viewport = sdl::SDL_Rect { x: vx, y: vy, w: vw, h: vh };
 
-        SDL_WINDOW = sdl::SDL_CreateWindow(
+    // Window and renderer -----------------------------------------------------
+    let window = unsafe {
+        sdl::SDL_CreateWindow(
             c"Jet-Set Willy".as_ptr(),
             sdl::SDL_WINDOWPOS_CENTERED_MASK as i32,
             sdl::SDL_WINDOWPOS_CENTERED_MASK as i32,
             0,
             0,
             sdl::SDL_WindowFlags::SDL_WINDOW_FULLSCREEN_DESKTOP as u32,
-        );
+        )
+    };
 
-        SDL_RENDERER = sdl::SDL_CreateRenderer(
-            SDL_WINDOW,
+    let renderer = unsafe {
+        sdl::SDL_CreateRenderer(
+            window,
             -1,
             (sdl::SDL_RendererFlags::SDL_RENDERER_TARGETTEXTURE as u32)
                 | (sdl::SDL_RendererFlags::SDL_RENDERER_ACCELERATED as u32)
                 | (sdl::SDL_RendererFlags::SDL_RENDERER_PRESENTVSYNC as u32),
-        );
+        )
+    };
 
-        sdl::SDL_SetHint(c"SDL_RENDER_SCALE_QUALITY".as_ptr(), c"2".as_ptr());
-        SDL_TARGET = sdl::SDL_CreateTexture(
-            SDL_RENDERER,
+    unsafe { sdl::SDL_SetHint(c"SDL_RENDER_SCALE_QUALITY".as_ptr(), c"2".as_ptr()) };
+    let target = unsafe {
+        sdl::SDL_CreateTexture(
+            renderer,
             sdl::SDL_PixelFormatEnum::SDL_PIXELFORMAT_ARGB8888 as u32,
             sdl::SDL_TextureAccess::SDL_TEXTUREACCESS_TARGET as i32,
             WIDTH * multiply,
             HEIGHT * multiply,
-        );
+        )
+    };
 
-        sdl::SDL_SetHint(c"SDL_RENDER_SCALE_QUALITY".as_ptr(), c"0".as_ptr());
-        SDL_TEXTURE = sdl::SDL_CreateTexture(
-            SDL_RENDERER,
+    unsafe { sdl::SDL_SetHint(c"SDL_RENDER_SCALE_QUALITY".as_ptr(), c"0".as_ptr()) };
+    let texture = unsafe {
+        sdl::SDL_CreateTexture(
+            renderer,
             sdl::SDL_PixelFormatEnum::SDL_PIXELFORMAT_ARGB8888 as u32,
             sdl::SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING as i32,
             WIDTH,
             HEIGHT,
-        );
+        )
+    };
 
-        sdl::SDL_ShowCursor(sdl::SDL_DISABLE as i32);
+    unsafe { sdl::SDL_ShowCursor(sdl::SDL_DISABLE as i32) };
 
-        let mut want: sdl::SDL_AudioSpec = std::mem::zeroed();
-        want.freq = SAMPLERATE;
-        want.format = sdl::AUDIO_S16SYS as sdl::SDL_AudioFormat;
-        want.channels = 2;
-        want.samples = 256;
-        want.callback = Some(sdl_audio_callback);
-        SDL_AUDIO = sdl::SDL_OpenAudioDevice(
-            std::ptr::null(),
-            0,
-            &raw const want,
-            std::ptr::null_mut(),
-            0,
-        );
-        sdl::SDL_PauseAudioDevice(SDL_AUDIO, 0);
+    // Audio -------------------------------------------------------------------
+    let want = sdl::SDL_AudioSpec {
+        freq: SAMPLERATE,
+        format: sdl::AUDIO_S16SYS as sdl::SDL_AudioFormat,
+        channels: 2,
+        silence: 0,
+        samples: 256,
+        padding: 0,
+        size: 0,
+        callback: Some(sdl_audio_callback),
+        userdata: std::ptr::null_mut(),
+    };
+    let audio = unsafe {
+        sdl::SDL_OpenAudioDevice(std::ptr::null(), 0, &raw const want, std::ptr::null_mut(), 0)
+    };
+    unsafe { sdl::SDL_PauseAudioDevice(audio, 0) };
 
-        KEY_STATE = sdl::SDL_GetKeyboardState(std::ptr::null_mut()) as *const u8;
-        srand(time(std::ptr::null_mut::<i64>()) as u32);
+    // Keyboard and RNG --------------------------------------------------------
+    KEY_STATE.with(|c| {
+        c.set(unsafe { sdl::SDL_GetKeyboardState(std::ptr::null_mut()) } as *const u8);
+    });
+    unsafe { srand(time(std::ptr::null_mut::<i64>()) as u32) };
 
-        Audio_Init();
+    unsafe { Audio_Init() };
 
-        let mut timer_frame = Timer { acc: 0, rate: 0, remainder: 0, divisor: 0 };
-        let mut timer_flash = Timer { acc: 0, rate: 0, remainder: 0, divisor: 0 };
-        Timer_Set(&raw mut timer_frame, TICKRATE, mode.refresh_rate);
-        Timer_Set(&raw mut timer_flash, 25, TICKRATE * 8);
+    // Timers ------------------------------------------------------------------
+    let mut timer_frame = Timer { acc: 0, rate: 0, remainder: 0, divisor: 0 };
+    let mut timer_flash = Timer { acc: 0, rate: 0, remainder: 0, divisor: 0 };
+    Timer_Set(&raw mut timer_frame, TICKRATE, mode.refresh_rate);
+    Timer_Set(&raw mut timer_flash, 25, TICKRATE * 8);
 
-        while GAME_RUNNING {
-            let frame = Timer_Update(&raw mut timer_frame);
+    // Main loop ---------------------------------------------------------------
+    while GAME_RUNNING.load(Relaxed) {
+        let frame = Timer_Update(&raw mut timer_frame);
 
-            sdl::SDL_LockTextureToSurface(SDL_TEXTURE, std::ptr::null(), &raw mut SDL_SURFACE);
+        let mut sdl_surface: *mut sdl::SDL_Surface = std::ptr::null_mut();
+        unsafe { sdl::SDL_LockTextureToSurface(texture, std::ptr::null(), &raw mut sdl_surface) };
+        SDL_SURFACE.with(|c| c.set(sdl_surface));
 
-            for _ in 0..frame {
+        for _ in 0..frame {
+            unsafe {
                 fire(*(&raw const Action));
-
                 while system_get_event() {
                     if *(&raw const gameInput) != Key::None as i32 {
                         fire(*(&raw const Responder));
                     }
                 }
-
                 fire(*(&raw const Ticker));
                 fire(*(&raw const Drawer));
-
                 *(&raw mut videoFlash) ^= Timer_Update(&raw mut timer_flash);
             }
-
-            sdl::SDL_UnlockTexture(SDL_TEXTURE);
-
-            let border = &videoColour[BORDER_INDEX];
-            sdl::SDL_SetRenderDrawColor(SDL_RENDERER, border.r, border.g, border.b, 0xff);
-            sdl::SDL_RenderClear(SDL_RENDERER);
-            sdl::SDL_SetRenderTarget(SDL_RENDERER, SDL_TARGET);
-            sdl::SDL_RenderCopy(SDL_RENDERER, SDL_TEXTURE, std::ptr::null(), std::ptr::null());
-            sdl::SDL_SetRenderTarget(SDL_RENDERER, std::ptr::null_mut());
-            sdl::SDL_RenderCopy(SDL_RENDERER, SDL_TARGET, std::ptr::null(), &raw const SDL_VIEWPORT);
-            sdl::SDL_RenderPresent(SDL_RENDERER);
         }
 
-        sdl::SDL_CloseAudioDevice(SDL_AUDIO);
-        sdl::SDL_DestroyTexture(SDL_TEXTURE);
-        sdl::SDL_DestroyTexture(SDL_TARGET);
-        sdl::SDL_DestroyRenderer(SDL_RENDERER);
-        sdl::SDL_DestroyWindow(SDL_WINDOW);
+        unsafe { sdl::SDL_UnlockTexture(texture) };
+
+        let border = &videoColour[BORDER_INDEX.load(Relaxed)];
+        unsafe {
+            sdl::SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, 0xff);
+            sdl::SDL_RenderClear(renderer);
+            sdl::SDL_SetRenderTarget(renderer, target);
+            sdl::SDL_RenderCopy(renderer, texture, std::ptr::null(), std::ptr::null());
+            sdl::SDL_SetRenderTarget(renderer, std::ptr::null_mut());
+            sdl::SDL_RenderCopy(renderer, target, std::ptr::null(), &raw const viewport);
+            sdl::SDL_RenderPresent(renderer);
+        }
+    }
+
+    // Teardown ----------------------------------------------------------------
+    unsafe {
+        sdl::SDL_CloseAudioDevice(audio);
+        sdl::SDL_DestroyTexture(texture);
+        sdl::SDL_DestroyTexture(target);
+        sdl::SDL_DestroyRenderer(renderer);
+        sdl::SDL_DestroyWindow(window);
         sdl::SDL_Quit();
     }
 }

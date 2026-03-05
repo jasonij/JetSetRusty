@@ -99,5 +99,5 @@ pub unsafe extern "C" fn Level_SetBorder() {
 }
 
 pub fn system_set_pixel(pos: i32, ink: i32) {
-    unsafe { System_SetPixel(pos, ink) }
+    System_SetPixel(pos, ink)
 }
