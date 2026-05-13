@@ -35,6 +35,7 @@ impl RopeData {
         Self { x, y }
     }
 }
+}
 
 static ROPE_DATA: [RopeData; 86] = [
     RopeData::new(0, 3),
