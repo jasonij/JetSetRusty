@@ -2,7 +2,7 @@
 
 use crate::common::{system_set_pixel, HEIGHT, WIDTH};
 
-use std::sync::{LazyLock, Mutex};
+use std::sync::LazyLock;
 
 unsafe extern "C" {
     pub fn System_SetPixel(point: i32, index: i32);

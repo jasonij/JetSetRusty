@@ -264,7 +264,7 @@ fn do_rope_drawer() {
             let seg =
                 MINER_WILLY_ROPE.load(Ordering::Relaxed) + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
-            let level_dir = unsafe { Level_Dir(R_ABOVE) };
+            let level_dir = unsafe { Level_Dir(R_ABOVE as i32) };
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
