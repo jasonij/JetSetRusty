@@ -20,7 +20,7 @@ cargo run             # run the game
 
 ## Architecture
 
-The game uses a **hybrid Rust/C approach** — modules are ported one at a time. The Rust entry point (`main.rs`) calls `game_main()`, a C function in `game_main.c` that owns the SDL2 window/audio setup and drives the main loop via four global function pointers:
+The game uses a **hybrid Rust/C approach** — modules are ported one at a time. Both the entry point (`main.rs`) and the main loop (`game_main.rs::run`) live in Rust; `game_main.rs` owns SDL2 window/audio setup and drives the loop via four global function pointers:
 
 ```
 Action    — current game state handler (runs once per frame, then sets itself to DoNothing)
@@ -29,13 +29,15 @@ Ticker    — logic/physics update
 Drawer    — rendering
 ```
 
-These are declared as `pub static mut` globals in C (`game_main.c`) and referenced by Rust via `unsafe extern "C"` blocks in `common.rs`. Each state transition works by re-assigning these pointers (e.g., `Action = Some(Title_Action)`).
+These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs` (and re-exported by `common.rs`); remaining C code references them via `extern`. Each state transition works by re-assigning the pointer (e.g., `Action = Some(Title_Action)`). The `Event` type is `Option<unsafe extern "C" fn()>`, so an unset slot is `None` and behaves as a no-op.
 
 ### Ported to Rust (`src/*.rs`)
 
 | Module | Role |
 |--------|------|
-| `common.rs` | `WIDTH=256`, `HEIGHT=192`, `Key` enum (`#[repr(C)]`), `Event` type alias, extern C declarations for C-side globals |
+| `main.rs` | Entry point — calls `game_main::run()` |
+| `game_main.rs` | SDL2 init, main loop, audio callback, keyboard polling, the four function-pointer globals |
+| `common.rs` | `WIDTH=256`, `HEIGHT=192`, `Key` enum (`#[repr(i32)]`), `Event` type alias, re-exports of `game_main` globals, extern decls for any unported C `*_Action` |
 | `video.rs` | Full rendering engine — `videoPixel` buffer, sprite drawing, two character sets (8px/128-char and 16px/96-char) |
 | `misc.rs` | 16-color `videoColour` palette (`#[no_mangle]`), `Timer` struct, `Video_Viewport` |
 | `cheat.rs` | "writetyper" cheat detection, level selection (1–60) |
@@ -47,19 +49,22 @@ These are declared as `pub static mut` globals in C (`game_main.c`) and referenc
 | `levels.rs` | Level data and room layout definitions |
 | `rope.rs` | Rope swing physics and rendering |
 | `codes.rs` | Copy-protection code entry and validation |
+| `game.rs` | **In-progress** port of `game.c`/`game.h` — currently mostly `unimplemented!()` stubs and shared constants/enums. Don't assume any function here works yet; check the body. |
 
 ### Still in C (compiled via `build.rs`)
 
-`game_main.c`, `game.c`, `miner.c`, `robots.c`
+`game.c`, `miner.c`, `robots.c` — these still implement `Game_Action`, miner physics, and robot movement. `build.rs` compiles only those three; everything else linked in is from Rust.
 
-Note: `src/title.c`, `src/levels.c`, `src/rope.c`, and `src/codes.c` exist on disk (originals before porting) but are **not compiled**.
+Note: `src/game_main.c`, `src/title.c`, `src/levels.c`, `src/rope.c`, and `src/codes.c` exist on disk (originals before porting) but are **not compiled** and should not be edited — they're reference material for the in-flight ports.
 
 ### FFI Conventions
 
 - Rust functions exported to C: `#[unsafe(no_mangle)]` with C-style names (e.g., `Video_DrawSprite`, `Audio_Init`)
-- C functions called from Rust: declared as `unsafe extern "C"` in each Rust file (or `common.rs`)
+- C functions called from Rust: declared as `unsafe extern "C"` blocks in each Rust file (or `common.rs`)
 - Shared globals: `static mut` with `#[unsafe(no_mangle)]`; Rust 2024 edition requires `&raw mut` / `&raw const` to take pointers to them (avoids `static_mut_refs` lint)
-- `Key` enum and `Colour` struct are `#[repr(C)]` for ABI compatibility; `Colour` has a `_padding: u8` field to match the C layout
+- `Key` enum and `Colour` struct are `#[repr(C)]`/`#[repr(i32)]` for ABI compatibility; `Colour` has a `_padding: u8` field to match the C layout
+
+**Module hierarchy for FFI declarations** (from `notes.md`): if an unported C function is used by multiple modules, declare it in `common.rs`. If only one module uses it, declare it locally. As a C file is ported, replace its extern declarations with the real `pub` Rust impl in the natural module — do **not** put FFI decls in a sibling module and import them, which inverts the dependency graph.
 
 ### Graphics Model
 
@@ -75,3 +80,15 @@ Note: `src/title.c`, `src/levels.c`, `src/rope.c`, and `src/codes.c` exist on di
 - Square wave oscillator: MSB of `phase` (u32) selects between two amplitude values
 - Music scores are `&[i16]` slices with events encoded as `(channel | type, note, duration)` triplets; `EV_END` terminates and either loops (`MUS_PLAY`) or stops (`MUS_STOP`)
 - `audioPanX` (exported to C) controls stereo position for SFX
+
+## Debugging
+
+Valgrind catches FFI memory mistakes that show up when porting C globals to Rust:
+
+```sh
+valgrind --error-exitcode=1 ./target/debug/jetsetrusty 2>&1 | head -40
+```
+
+## Room reference
+
+`ROOMS.md` is the authoritative numbered list of all 60 rooms with their teleport-code key bindings (used by the "writetyper" cheat). Refer to it when working on level transitions, cheat code handling, or anything that names a specific room.

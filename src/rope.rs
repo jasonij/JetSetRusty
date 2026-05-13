@@ -37,7 +37,95 @@ impl RopeData {
     }
 }
 
-static ROPE_DATA: [RopeData; 1] = [RopeData::new(0, 3)];
+static ROPE_DATA: [RopeData; 86] = [
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(1, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(1, 2),
+    RopeData::new(1, 2),
+    RopeData::new(2, 2),
+    RopeData::new(1, 2),
+    RopeData::new(1, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(3, 2),
+    RopeData::new(2, 2),
+    RopeData::new(3, 2),
+    RopeData::new(2, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
+];
+
 static ROPE_MOVE: [i32; 2] = [-1, 1];
 
 // ----------------------------------------------------------------------------
@@ -74,17 +162,17 @@ macro_rules! rope_set {
 // EVENT function pointers — exposed to C
 // ----------------------------------------------------------------------------
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut Rope_Ticker: Option<unsafe extern "C" fn()> = None;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut Rope_Drawer: Option<unsafe extern "C" fn()> = None;
 
 // ----------------------------------------------------------------------------
 // Extern declarations — things still living in C
 // ----------------------------------------------------------------------------
 
-extern "C" {
+unsafe extern "C" {
     static mut minerWillyRope: i32;
     static mut minerWilly: MinerWilly;
 
@@ -132,7 +220,9 @@ fn do_rope_drawer() {
         let pixel_val = video_get_pixel(&mut pixels, pos);
         let willy_rope_zero = unsafe { minerWillyRope == 0 };
         if willy_rope_zero && (pixel_val & B_WILLY) != 0 {
-            unsafe { minerWillyRope = seg; }
+            unsafe {
+                minerWillyRope = seg;
+            }
             rope_set!(hold, 1);
         }
 
@@ -168,7 +258,9 @@ fn do_rope_drawer() {
 
     // Handle negative minerWillyRope
     if unsafe { minerWillyRope < 0 } {
-        unsafe { minerWillyRope += 1; }
+        unsafe {
+            minerWillyRope += 1;
+        }
         rope_set!(hold, 0);
         return;
     }
@@ -182,14 +274,12 @@ fn do_rope_drawer() {
             let seg = unsafe { minerWillyRope } + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
             let level_dir = unsafe { Level_Dir(R_ABOVE) };
-            let adjusted_seg = if level_dir == 0 && seg < 15 {
-                15
-            } else {
-                seg
-            };
+            let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
-                unsafe { minerWillyRope = adjusted_seg; }
+                unsafe {
+                    minerWillyRope = adjusted_seg;
+                }
                 return;
             }
 
@@ -228,7 +318,7 @@ extern "C" fn rope_drawer_trampoline() {
 // Public API
 // ----------------------------------------------------------------------------
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn Rope_Init() {
     let level = unsafe { gameLevel };
     let (x, ink) = match level {
