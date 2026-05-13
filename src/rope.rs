@@ -19,6 +19,7 @@ use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{video_draw_rope_seg, video_get_pixel, VIDEO_PIXEL};
 use std::sync::{LazyLock, Mutex};
 use std::cell::Cell;
+use std::sync::Mutex;
 
 const ROPE_SEGS: i32 = 33;
 
