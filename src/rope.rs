@@ -158,21 +158,14 @@ static mut ROPE_TICKER: Option<extern "C" fn()> = None;
 static mut ROPE_DRAWER: Option<extern "C" fn()> = None;
 
 // ----------------------------------------------------------------------------
-// Extern declarations
+// Extern declarations - the real C globals shared with levels.rs and the C code
 // ----------------------------------------------------------------------------
 
-static MINER_WILLY_ROPE: AtomicI32 = AtomicI32::new(0);
-static MINER_WILLY: Mutex<MinerWilly> = Mutex::new(MinerWilly {
-    x: 0,
-    y: 0,
-    tile: 0,
-    align: 0,
-    frame: 0,
-    dir: 0,
-    r#move: 0,
-    air: 0,
-    jump: 0,
-});
+unsafe extern "C" {
+    static gameLevel: i32;
+    static mut minerWilly: MinerWilly;
+    static mut minerWillyRope: i32;
+}
 
 // Level constants
 const B_WILLY: i32 = 4;
@@ -212,14 +205,16 @@ fn do_rope_drawer() {
 
         // Check for Willy collision
         let pixel_val = video_get_pixel(&mut pixels, pos);
-        let willy_rope_zero = MINER_WILLY_ROPE.load(Ordering::Relaxed) == 0;
+        let willy_rope_zero = unsafe { minerWillyRope } == 0;
         if willy_rope_zero && (pixel_val & B_WILLY) != 0 {
-            MINER_WILLY_ROPE.store(seg, Ordering::Relaxed);
+            unsafe {
+                minerWillyRope = seg;
+            }
             ROPE.hold.store(1, Ordering::Relaxed);
         }
 
         // Handle Willy position if holding rope
-        let willy_on_rope = MINER_WILLY_ROPE.load(Ordering::Relaxed) == seg;
+        let willy_on_rope = unsafe { minerWillyRope } == seg;
         if willy_on_rope && ROPE.hold.load(Ordering::Relaxed) != 0 {
             let willy_x = x & 248;
             let willy_y = y - 8;
@@ -236,45 +231,50 @@ fn do_rope_drawer() {
                 }
             };
 
-            let mut willy = MINER_WILLY.lock().unwrap();
-            willy.x = if frame < 2 { willy_x } else { willy_x - 8 };
-            willy.y = willy_y;
-            willy.frame = frame;
-            willy.tile = willy.y / 8 * 32 + willy.x / 8;
-            willy.align = yalign(y);
+            unsafe {
+                minerWilly.x = if frame < 2 { willy_x } else { willy_x - 8 };
+                minerWilly.y = willy_y;
+                minerWilly.frame = frame;
+                minerWilly.tile = minerWilly.y / 8 * 32 + minerWilly.x / 8;
+                minerWilly.align = yalign(y);
+            }
         }
 
         video_draw_rope_seg(pos, ink);
     }
 
     // Handle negative minerWillyRope
-    if MINER_WILLY_ROPE.load(Ordering::Relaxed) < 0 {
-        MINER_WILLY_ROPE.fetch_add(1, Ordering::Relaxed);
+    if unsafe { minerWillyRope } < 0 {
+        unsafe {
+            minerWillyRope += 1;
+        }
         ROPE.hold.store(0, Ordering::Relaxed);
         return;
     }
 
     // Handle rope movement when holding
     if ROPE.hold.load(Ordering::Relaxed) != 0 {
-        let willy_moving = MINER_WILLY.lock().unwrap().r#move != 0;
+        let willy_moving = unsafe { minerWilly.r#move } != 0;
         if willy_moving {
             let dir = ROPE.dir.load(Ordering::Relaxed);
-            let willy_dir = MINER_WILLY.lock().unwrap().dir;
-            let seg =
-                MINER_WILLY_ROPE.load(Ordering::Relaxed) + ROPE_MOVE[(dir ^ willy_dir) as usize];
+            let willy_dir = unsafe { minerWilly.dir };
+            let seg = unsafe { minerWillyRope } + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
             let level_dir = unsafe { Level_Dir(R_ABOVE) };
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
-                MINER_WILLY_ROPE.store(adjusted_seg, Ordering::Relaxed);
+                unsafe {
+                    minerWillyRope = adjusted_seg;
+                }
                 return;
             }
 
-            MINER_WILLY_ROPE.store(-16, Ordering::Relaxed);
-            let mut willy = MINER_WILLY.lock().unwrap();
-            willy.y &= 124;
-            willy.air = 0;
+            unsafe {
+                minerWillyRope = -16;
+                minerWilly.y &= 124;
+                minerWilly.air = 0;
+            }
         }
     }
 }
@@ -338,6 +338,5 @@ pub extern "C" fn Rope_Init() {
 extern "C" fn DoNothing() {}
 
 unsafe extern "C" {
-    static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
 }
