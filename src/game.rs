@@ -228,7 +228,7 @@ pub fn Game_GotItem() {
     unimplemented!("Game_GotItem not yet implemented")
 }
 
-pub fn Game_ChangeLevel(dir: i32) {
+pub fn Game_ChangeLevel(_dir: i32) {
     unimplemented!("Game_ChangeLevel not yet implemented")
 }
 
@@ -240,7 +240,7 @@ pub fn Game_DrawStatus() {
     unimplemented!("Game_DrawStatus not yet implemented")
 }
 
-pub fn Game_Pause(state: i32) {
+pub fn Game_Pause(_state: i32) {
     unimplemented!("Game_Pause not yet implemented")
 }
 
@@ -272,7 +272,7 @@ pub fn Level_Ticker() {
     unimplemented!("Level_Ticker not yet implemented")
 }
 
-pub fn Level_GetTileType(tile: i32) -> i32 {
+pub fn Level_GetTileType(_tile: i32) -> i32 {
     // This is a simplified version of the original C function
     // In a real implementation, you would need to access the level data
     // and return the appropriate tile type based on the tile value
@@ -281,11 +281,11 @@ pub fn Level_GetTileType(tile: i32) -> i32 {
     TileType::Space as i32
 }
 
-pub fn Level_GetTileRamp(tile: i32) -> i32 {
+pub fn Level_GetTileRamp(_tile: i32) -> i32 {
     unimplemented!("Level_GetTileRamp not yet implemented")
 }
 
-pub fn Level_EraseItem(item: i32) {
+pub fn Level_EraseItem(_item: i32) {
     unimplemented!("Level_EraseItem not yet implemented")
 }
 
@@ -293,7 +293,7 @@ pub fn Level_ItemCount() -> i32 {
     unimplemented!("Level_ItemCount not yet implemented")
 }
 
-pub fn Level_Dir(dir: i32) -> i32 {
+pub fn Level_Dir(_dir: i32) -> i32 {
     unimplemented!("Level_Dir not yet implemented")
 }
 
@@ -324,7 +324,7 @@ pub fn Miner_Restore() {
     unimplemented!("Miner_Restore not yet implemented")
 }
 
-pub fn Miner_SetSeq(seq: i32, frame: i32) {
+pub fn Miner_SetSeq(_seq: i32, _frame: i32) {
     unimplemented!("Miner_SetSeq not yet implemented")
 }
 
@@ -332,7 +332,7 @@ pub fn Miner_IncSeq() {
     unimplemented!("Miner_IncSeq not yet implemented")
 }
 
-pub fn Miner_DrawSeqSprite(pos: i32, frame: u8, ink: u8) {
+pub fn Miner_DrawSeqSprite(_pos: i32, _frame: u8, _ink: u8) {
     unimplemented!("Miner_DrawSeqSprite not yet implemented")
 }
 
