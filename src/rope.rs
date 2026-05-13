@@ -220,9 +220,7 @@ fn do_rope_drawer() {
         let pixel_val = video_get_pixel(&mut pixels, pos);
         let willy_rope_zero = unsafe { minerWillyRope == 0 };
         if willy_rope_zero && (pixel_val & B_WILLY) != 0 {
-            unsafe {
-                minerWillyRope = seg;
-            }
+            minerWillyRope = seg;
             rope_set!(hold, 1);
         }
 
@@ -244,13 +242,11 @@ fn do_rope_drawer() {
                 }
             };
 
-            unsafe {
-                minerWilly.x = if frame < 2 { willy_x } else { willy_x - 8 };
-                minerWilly.y = willy_y;
-                minerWilly.frame = frame;
-                minerWilly.tile = minerWilly.y / 8 * 32 + minerWilly.x / 8;
-                minerWilly.align = yalign(y);
-            }
+            minerWilly.x = if frame < 2 { willy_x } else { willy_x - 8 };
+            minerWilly.y = willy_y;
+            minerWilly.frame = frame;
+            minerWilly.tile = minerWilly.y / 8 * 32 + minerWilly.x / 8;
+            minerWilly.align = yalign(y);
         }
 
         video_draw_rope_seg(pos, ink);
@@ -277,17 +273,13 @@ fn do_rope_drawer() {
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
-                unsafe {
-                    minerWillyRope = adjusted_seg;
-                }
+                minerWillyRope = adjusted_seg;
                 return;
             }
 
-            unsafe {
-                minerWillyRope = -16;
-                minerWilly.y &= 124;
-                minerWilly.air = 0;
-            }
+            minerWillyRope = -16;
+            minerWilly.y &= 124;
+            minerWilly.air = 0;
         }
     }
 }
@@ -328,10 +320,8 @@ pub extern "C" fn Rope_Init() {
         SWIMMINGPOOL => (16, 7u8),
         THEBEACH => (14, 5u8),
         _ => {
-            unsafe {
-                Rope_Ticker = Some(DoNothing);
-                Rope_Drawer = Some(DoNothing);
-            }
+            Rope_Ticker = Some(DoNothing);
+            Rope_Drawer = Some(DoNothing);
             return;
         }
     };
@@ -343,8 +333,6 @@ pub extern "C" fn Rope_Init() {
     rope_set!(side, 0);
     rope_set!(hold, 0);
 
-    unsafe {
-        Rope_Ticker = Some(rope_ticker_trampoline);
-        Rope_Drawer = Some(rope_drawer_trampoline);
-    }
+    Rope_Ticker = Some(rope_ticker_trampoline);
+    Rope_Drawer = Some(rope_drawer_trampoline);
 }
