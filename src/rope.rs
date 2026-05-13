@@ -26,25 +26,92 @@ impl RopeData {
 }
 
 static ROPE_DATA: [RopeData; 86] = [
-    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
-    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
-    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
-    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
-    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
-    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
-    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
-    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(1, 3),
-    RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3),
-    RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3),
-    RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(2, 3),
-    RopeData::new(2, 3), RopeData::new(2, 3), RopeData::new(2, 2), RopeData::new(2, 3),
-    RopeData::new(2, 2), RopeData::new(2, 3), RopeData::new(2, 2), RopeData::new(2, 3),
-    RopeData::new(2, 2), RopeData::new(2, 2), RopeData::new(2, 2), RopeData::new(2, 3),
-    RopeData::new(2, 2), RopeData::new(2, 2), RopeData::new(2, 2), RopeData::new(1, 2),
-    RopeData::new(2, 2), RopeData::new(1, 2), RopeData::new(1, 2), RopeData::new(2, 2),
-    RopeData::new(1, 2), RopeData::new(1, 2), RopeData::new(2, 2), RopeData::new(3, 2),
-    RopeData::new(2, 2), RopeData::new(3, 2), RopeData::new(3, 2), RopeData::new(3, 2),
-    RopeData::new(3, 2), RopeData::new(3, 2), RopeData::new(3, 2),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(0, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(1, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 3),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(1, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(1, 2),
+    RopeData::new(1, 2),
+    RopeData::new(2, 2),
+    RopeData::new(1, 2),
+    RopeData::new(1, 2),
+    RopeData::new(2, 2),
+    RopeData::new(2, 2),
+    RopeData::new(3, 2),
+    RopeData::new(2, 2),
+    RopeData::new(3, 2),
+    RopeData::new(2, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
+    RopeData::new(3, 2),
 ];
 
 static ROPE_MOVE: [i32; 2] = [-1, 1];
@@ -131,7 +198,8 @@ fn do_rope_drawer() {
     video_draw_rope_seg(x, ink);
 
     if ROPE.pos.load(Ordering::Relaxed) == 0 {
-        ROPE.side.store(ROPE.side.load(Ordering::Relaxed) ^ 1, Ordering::Relaxed);
+        ROPE.side
+            .store(ROPE.side.load(Ordering::Relaxed) ^ 1, Ordering::Relaxed);
     }
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap();
@@ -162,7 +230,11 @@ fn do_rope_drawer() {
             } else if (x & 4) != 0 {
                 0
             } else {
-                if (x & 2) != 0 { 3 } else { 2 }
+                if (x & 2) != 0 {
+                    3
+                } else {
+                    2
+                }
             };
 
             let mut willy = MINER_WILLY.lock().unwrap();
@@ -189,7 +261,8 @@ fn do_rope_drawer() {
         if willy_moving {
             let dir = ROPE.dir.load(Ordering::Relaxed);
             let willy_dir = MINER_WILLY.lock().unwrap().dir;
-            let seg = MINER_WILLY_ROPE.load(Ordering::Relaxed) + ROPE_MOVE[(dir ^ willy_dir) as usize];
+            let seg =
+                MINER_WILLY_ROPE.load(Ordering::Relaxed) + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
             let level_dir = unsafe { Level_Dir(R_ABOVE) };
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
@@ -222,17 +295,17 @@ fn do_rope_ticker() {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rope_ticker_trampoline() {
     do_rope_ticker();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rope_drawer_trampoline() {
     do_rope_drawer();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn Rope_Init() {
     let level = unsafe { gameLevel };
     let (x, ink) = match level {
@@ -263,8 +336,8 @@ pub extern "C" fn Rope_Init() {
     }
 }
 
-extern "C" {
-    fn DoNothing();
+unsafe extern "C" {
+    unsafe fn DoNothing();
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
 }
