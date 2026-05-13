@@ -342,7 +342,9 @@ pub extern "C" fn Rope_Init() {
 
 }
 #[no_mangle]
-pub extern "C" fn DoNothing() {}
+pub extern "C" fn DoNothing() {
+    // Empty function
+}
 unsafe extern "C" {
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
