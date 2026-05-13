@@ -111,6 +111,7 @@ pub static videoColour: [Colour; 16] = [
 ];
 
 // Timer -----------------------------------------------------------------------
+#[derive(Clone)]
 #[repr(C)]
 pub struct Timer {
     pub acc: i32,
