@@ -303,12 +303,12 @@ fn do_rope_ticker() {
 }
 
 #[no_mangle]
-extern "C" fn rope_ticker_trampoline() {
+pub extern "C" fn rope_ticker_trampoline() {
     do_rope_ticker();
 }
 
 #[no_mangle]
-extern "C" fn rope_drawer_trampoline() {
+pub extern "C" fn rope_drawer_trampoline() {
     do_rope_drawer();
 }
 
