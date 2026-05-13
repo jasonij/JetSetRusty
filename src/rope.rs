@@ -1,30 +1,13 @@
 #![allow(non_snake_case)]
 
-/// rope.rs was ported over by talking with Claude Sonnet 4.6 Extended via the
-/// web browser chat interface. I've been experimenting using LLMs for porting
-/// these files, for example the Claude Code CLI tool, Aider, Emacs integrations
-/// like gptel, ellama, and Aidermacs (this is being replaced with Emigo), along
-/// with many different models through Ollama.
-///
-/// I think so far I've gotten the best results from the web-based Claude chat
-/// client, actually. That said, obviously there's had to be some manual
-/// verification and fixing (it doesn't compile out of the gate and throws a
-/// bazillion warnings) but it's been faster and less expensive than using
-/// Claude Code directly (for me). I like the thread-local state bundle struct,
-/// although we'll have to see how this shakes out once everything has been
-/// ported over and we get to remove all the C FFI code.
-///
+/// rope.rs - Modernized version with proper FFI safety
 use crate::common::{MinerWilly, WIDTH};
 use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{video_draw_rope_seg, video_get_pixel, VIDEO_PIXEL};
-use std::cell::Cell;
-use std::sync::{LazyLock, Mutex};
+use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::Mutex;
 
 const ROPE_SEGS: i32 = 33;
-
-unsafe extern "C" {
-    fn DoNothing();
-}
 
 // ----------------------------------------------------------------------------
 // Rope animation data (immutable, no unsafe needed)
@@ -43,157 +26,91 @@ impl RopeData {
 }
 
 static ROPE_DATA: [RopeData; 86] = [
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(0, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(1, 3),
-    RopeData::new(2, 3),
-    RopeData::new(2, 3),
-    RopeData::new(2, 3),
-    RopeData::new(2, 3),
-    RopeData::new(2, 2),
-    RopeData::new(2, 3),
-    RopeData::new(2, 3),
-    RopeData::new(2, 2),
-    RopeData::new(2, 3),
-    RopeData::new(2, 2),
-    RopeData::new(2, 3),
-    RopeData::new(2, 2),
-    RopeData::new(2, 3),
-    RopeData::new(2, 2),
-    RopeData::new(2, 2),
-    RopeData::new(2, 2),
-    RopeData::new(2, 3),
-    RopeData::new(2, 2),
-    RopeData::new(2, 2),
-    RopeData::new(2, 2),
-    RopeData::new(2, 2),
-    RopeData::new(2, 2),
-    RopeData::new(1, 2),
-    RopeData::new(2, 2),
-    RopeData::new(2, 2),
-    RopeData::new(1, 2),
-    RopeData::new(1, 2),
-    RopeData::new(2, 2),
-    RopeData::new(1, 2),
-    RopeData::new(1, 2),
-    RopeData::new(2, 2),
-    RopeData::new(2, 2),
-    RopeData::new(3, 2),
-    RopeData::new(2, 2),
-    RopeData::new(3, 2),
-    RopeData::new(2, 2),
-    RopeData::new(3, 2),
-    RopeData::new(3, 2),
-    RopeData::new(3, 2),
-    RopeData::new(3, 2),
-    RopeData::new(3, 2),
-    RopeData::new(3, 2),
+    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
+    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
+    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
+    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
+    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
+    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
+    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3),
+    RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(0, 3), RopeData::new(1, 3),
+    RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3),
+    RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3),
+    RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(1, 3), RopeData::new(2, 3),
+    RopeData::new(2, 3), RopeData::new(2, 3), RopeData::new(2, 2), RopeData::new(2, 3),
+    RopeData::new(2, 2), RopeData::new(2, 3), RopeData::new(2, 2), RopeData::new(2, 3),
+    RopeData::new(2, 2), RopeData::new(2, 2), RopeData::new(2, 2), RopeData::new(2, 3),
+    RopeData::new(2, 2), RopeData::new(2, 2), RopeData::new(2, 2), RopeData::new(1, 2),
+    RopeData::new(2, 2), RopeData::new(1, 2), RopeData::new(1, 2), RopeData::new(2, 2),
+    RopeData::new(1, 2), RopeData::new(1, 2), RopeData::new(2, 2), RopeData::new(3, 2),
+    RopeData::new(2, 2), RopeData::new(3, 2), RopeData::new(3, 2), RopeData::new(3, 2),
+    RopeData::new(3, 2), RopeData::new(3, 2), RopeData::new(3, 2),
 ];
 
 static ROPE_MOVE: [i32; 2] = [-1, 1];
 
 // ----------------------------------------------------------------------------
-// Rope state — thread_local + Cell means no unsafe for reads/writes
+// Rope state - using Atomic types for thread-safe access
 // ----------------------------------------------------------------------------
 
-#[derive(Default)]
 struct RopeState {
-    dir: Cell<i32>,
-    pos: Cell<i32>,
-    hold: Cell<i32>,
-    x: Cell<i32>,
-    side: Cell<i32>,
-    ink: Cell<u8>,
+    dir: AtomicI32,
+    pos: AtomicI32,
+    hold: AtomicI32,
+    x: AtomicI32,
+    side: AtomicI32,
+    ink: AtomicI32,
 }
 
-thread_local! {
-    static ROPE: RopeState = RopeState::default();
+impl Default for RopeState {
+    fn default() -> Self {
+        Self {
+            dir: AtomicI32::new(0),
+            pos: AtomicI32::new(0),
+            hold: AtomicI32::new(0),
+            x: AtomicI32::new(0),
+            side: AtomicI32::new(0),
+            ink: AtomicI32::new(0),
+        }
+    }
 }
 
-macro_rules! rope_get {
-    ($field:ident) => {
-        ROPE.with(|r| r.$field.get())
-    };
-}
-
-macro_rules! rope_set {
-    ($field:ident, $val:expr) => {
-        ROPE.with(|r| r.$field.set($val))
-    };
-}
+static ROPE: RopeState = RopeState {
+    dir: AtomicI32::new(0),
+    pos: AtomicI32::new(0),
+    hold: AtomicI32::new(0),
+    x: AtomicI32::new(0),
+    side: AtomicI32::new(0),
+    ink: AtomicI32::new(0),
+};
 
 // ----------------------------------------------------------------------------
-// EVENT function pointers — exposed to C
+// FFI function pointers - stored as static Option
 // ----------------------------------------------------------------------------
 
-static ROPE_TICKER: LazyLock<Mutex<Option<extern "C" fn()>>> =
-    LazyLock::new(|| Mutex::new(Some(DoNothing)));
-static ROPE_DRAWER: LazyLock<Mutex<Option<extern "C" fn()>>> =
-    LazyLock::new(|| Mutex::new(Some(DoNothing)));
+static mut ROPE_TICKER: Option<extern "C" fn()> = None;
+static mut ROPE_DRAWER: Option<extern "C" fn()> = None;
 
 // ----------------------------------------------------------------------------
-// Extern declarations — things still living in C
+// Extern declarations
 // ----------------------------------------------------------------------------
 
-static MINER_WILLY_ROPE: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
-static MINER_WILLY: LazyLock<Mutex<MinerWilly>> = LazyLock::new(|| {
-    Mutex::new(MinerWilly {
-        x: 0,
-        y: 0,
-        tile: 0,
-        align: 0,
-        frame: 0,
-        dir: 0,
-        r#move: 0,
-        air: 0,
-        jump: 0,
-    })
+static MINER_WILLY_ROPE: AtomicI32 = AtomicI32::new(0);
+static MINER_WILLY: Mutex<MinerWilly> = Mutex::new(MinerWilly {
+    x: 0,
+    y: 0,
+    tile: 0,
+    align: 0,
+    frame: 0,
+    dir: 0,
+    r#move: 0,
+    air: 0,
+    jump: 0,
 });
 
-// Level constants — verified against game.h, these are the rope rooms
-const B_WILLY: i32 = 4; // video.h
-const R_ABOVE: i32 = 0; // game.h
+// Level constants
+const B_WILLY: i32 = 4;
+const R_ABOVE: i32 = 0;
 
 #[inline]
 fn yalign(y: i32) -> i32 {
@@ -205,38 +122,38 @@ fn yalign(y: i32) -> i32 {
 // ----------------------------------------------------------------------------
 
 fn do_rope_drawer() {
-    let mut data_idx = rope_get!(pos) as usize;
-    let ink = rope_get!(ink);
+    let mut data_idx = ROPE.pos.load(Ordering::Relaxed) as usize;
+    let ink = ROPE.ink.load(Ordering::Relaxed) as u8;
 
-    let mut x = rope_get!(x) * 8;
+    let mut x = ROPE.x.load(Ordering::Relaxed) * 8;
     let mut y: i32 = 0;
 
     video_draw_rope_seg(x, ink);
 
-    if rope_get!(pos) == 0 {
-        rope_set!(side, rope_get!(side) ^ 1);
+    if ROPE.pos.load(Ordering::Relaxed) == 0 {
+        ROPE.side.store(ROPE.side.load(Ordering::Relaxed) ^ 1, Ordering::Relaxed);
     }
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap();
     for seg in 1..ROPE_SEGS {
         let data = &ROPE_DATA[data_idx];
         y += data.y;
-        x -= data.x * ROPE_MOVE[rope_get!(side) as usize];
+        x -= data.x * ROPE_MOVE[ROPE.side.load(Ordering::Relaxed) as usize];
         data_idx += 1;
 
         let pos = y * WIDTH + x;
 
         // Check for Willy collision
         let pixel_val = video_get_pixel(&mut pixels, pos);
-        let willy_rope_zero = *MINER_WILLY_ROPE.lock().unwrap() == 0;
+        let willy_rope_zero = MINER_WILLY_ROPE.load(Ordering::Relaxed) == 0;
         if willy_rope_zero && (pixel_val & B_WILLY) != 0 {
-            *MINER_WILLY_ROPE.lock().unwrap() = seg;
-            rope_set!(hold, 1);
+            MINER_WILLY_ROPE.store(seg, Ordering::Relaxed);
+            ROPE.hold.store(1, Ordering::Relaxed);
         }
 
         // Handle Willy position if holding rope
-        let willy_on_rope = *MINER_WILLY_ROPE.lock().unwrap() == seg;
-        if willy_on_rope && rope_get!(hold) != 0 {
+        let willy_on_rope = MINER_WILLY_ROPE.load(Ordering::Relaxed) == seg;
+        if willy_on_rope && ROPE.hold.load(Ordering::Relaxed) != 0 {
             let willy_x = x & 248;
             let willy_y = y - 8;
 
@@ -245,103 +162,109 @@ fn do_rope_drawer() {
             } else if (x & 4) != 0 {
                 0
             } else {
-                if (x & 2) != 0 {
-                    3
-                } else {
-                    2
-                }
+                if (x & 2) != 0 { 3 } else { 2 }
             };
 
-            MINER_WILLY.lock().unwrap().x = if frame < 2 { willy_x } else { willy_x - 8 };
-            MINER_WILLY.lock().unwrap().y = willy_y;
-            MINER_WILLY.lock().unwrap().frame = frame;
-            MINER_WILLY.lock().unwrap().tile =
-                MINER_WILLY.lock().unwrap().y / 8 * 32 + MINER_WILLY.lock().unwrap().x / 8;
-            MINER_WILLY.lock().unwrap().align = yalign(y);
+            let mut willy = MINER_WILLY.lock().unwrap();
+            willy.x = if frame < 2 { willy_x } else { willy_x - 8 };
+            willy.y = willy_y;
+            willy.frame = frame;
+            willy.tile = willy.y / 8 * 32 + willy.x / 8;
+            willy.align = yalign(y);
         }
 
         video_draw_rope_seg(pos, ink);
     }
 
     // Handle negative minerWillyRope
-    if *MINER_WILLY_ROPE.lock().unwrap() < 0 {
-        *MINER_WILLY_ROPE.lock().unwrap() += 1;
-        rope_set!(hold, 0);
+    if MINER_WILLY_ROPE.load(Ordering::Relaxed) < 0 {
+        MINER_WILLY_ROPE.fetch_add(1, Ordering::Relaxed);
+        ROPE.hold.store(0, Ordering::Relaxed);
         return;
     }
 
     // Handle rope movement when holding
-    if rope_get!(hold) != 0 {
+    if ROPE.hold.load(Ordering::Relaxed) != 0 {
         let willy_moving = MINER_WILLY.lock().unwrap().r#move != 0;
         if willy_moving {
-            let dir = rope_get!(dir);
+            let dir = ROPE.dir.load(Ordering::Relaxed);
             let willy_dir = MINER_WILLY.lock().unwrap().dir;
-            let seg = *MINER_WILLY_ROPE.lock().unwrap() + ROPE_MOVE[(dir ^ willy_dir) as usize];
+            let seg = MINER_WILLY_ROPE.load(Ordering::Relaxed) + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
             let level_dir = unsafe { Level_Dir(R_ABOVE) };
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
-                *MINER_WILLY_ROPE.lock().unwrap() = adjusted_seg;
+                MINER_WILLY_ROPE.store(adjusted_seg, Ordering::Relaxed);
                 return;
             }
 
-            *MINER_WILLY_ROPE.lock().unwrap() = -16;
-            MINER_WILLY.lock().unwrap().y &= 124;
-            MINER_WILLY.lock().unwrap().air = 0;
+            MINER_WILLY_ROPE.store(-16, Ordering::Relaxed);
+            let mut willy = MINER_WILLY.lock().unwrap();
+            willy.y &= 124;
+            willy.air = 0;
         }
     }
 }
 
 fn do_rope_ticker() {
-    let dir = rope_get!(dir);
-    let side = rope_get!(side);
+    let dir = ROPE.dir.load(Ordering::Relaxed);
+    let side = ROPE.side.load(Ordering::Relaxed);
     let step = ROPE_MOVE[(dir ^ side) as usize] * 2;
 
-    rope_set!(pos, rope_get!(pos) + step);
+    let new_pos = ROPE.pos.load(Ordering::Relaxed) + step;
+    ROPE.pos.store(new_pos, Ordering::Relaxed);
 
-    if rope_get!(pos) < 16 {
-        rope_set!(pos, rope_get!(pos) + step);
-    } else if rope_get!(pos) == 54 {
-        rope_set!(dir, dir ^ 1);
+    if new_pos < 16 {
+        ROPE.pos.store(new_pos + step, Ordering::Relaxed);
+    } else if new_pos == 54 {
+        ROPE.dir.store(dir ^ 1, Ordering::Relaxed);
     }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub extern "C" fn rope_ticker_trampoline() {
     do_rope_ticker();
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub extern "C" fn rope_drawer_trampoline() {
     do_rope_drawer();
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub extern "C" fn Rope_Init() {
     let level = unsafe { gameLevel };
     let (x, ink) = match level {
-        QUIRKAFLEEG => (16, 6u8),
-        ONTHEROOF => (16, 4u8),
-        COLDSTORE => (16, 6u8),
-        SWIMMINGPOOL => (16, 7u8),
-        THEBEACH => (14, 5u8),
+        QUIRKAFLEEG => (16, 6),
+        ONTHEROOF => (16, 4),
+        COLDSTORE => (16, 6),
+        SWIMMINGPOOL => (16, 7),
+        THEBEACH => (14, 5),
         _ => {
-            *ROPE_TICKER.lock().unwrap() = Some(DoNothing);
-            *ROPE_DRAWER.lock().unwrap() = Some(DoNothing);
+            unsafe {
+                ROPE_TICKER = Some(DoNothing);
+                ROPE_DRAWER = Some(DoNothing);
+            }
             return;
         }
     };
 
-    rope_set!(x, x);
-    rope_set!(ink, ink);
-    rope_set!(dir, 0);
-    rope_set!(pos, 34);
-    rope_set!(side, 0);
-    rope_set!(hold, 0);
+    ROPE.x.store(x, Ordering::Relaxed);
+    ROPE.ink.store(ink, Ordering::Relaxed);
+    ROPE.dir.store(0, Ordering::Relaxed);
+    ROPE.pos.store(34, Ordering::Relaxed);
+    ROPE.side.store(0, Ordering::Relaxed);
+    ROPE.hold.store(0, Ordering::Relaxed);
+
+    unsafe {
+        ROPE_TICKER = Some(rope_ticker_trampoline);
+        ROPE_DRAWER = Some(rope_drawer_trampoline);
+    }
 }
 
-unsafe extern "C" {
+extern "C" {
+    fn DoNothing();
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
 }
