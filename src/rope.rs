@@ -165,18 +165,19 @@ macro_rules! rope_set {
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 #[unsafe(no_mangle)]
-static Rope_Ticker: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(&mut None);
+static Rope_Ticker: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(Box::into_raw(Box::new(None)));
 
 #[unsafe(no_mangle)]
-static Rope_Drawer: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(&mut None);
+static Rope_Drawer: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(Box::into_raw(Box::new(None)));
 
 // ----------------------------------------------------------------------------
 // Extern declarations — things still living in C
 // ----------------------------------------------------------------------------
 
-unsafe extern "C" {
-    static mut minerWillyRope: i32;
-    static mut minerWilly: MinerWilly;
+use std::sync::Mutex;
+
+static mut minerWillyRope: Mutex<i32> = Mutex::new(0);
+static mut minerWilly: Mutex<MinerWilly> = Mutex::new(MinerWilly::default());
 
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;

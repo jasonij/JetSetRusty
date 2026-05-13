@@ -228,7 +228,7 @@ pub fn Game_GotItem() {
     unimplemented!("Game_GotItem not yet implemented")
 }
 
-pub fn Game_ChangeLevel(_dir: i32) {
+pub fn Game_ChangeLevel(dir: i32) {
     unimplemented!("Game_ChangeLevel not yet implemented")
 }
 
