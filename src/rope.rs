@@ -336,8 +336,9 @@ pub extern "C" fn Rope_Init() {
     }
 }
 
+extern "C" fn DoNothing() {}
+
 extern "C" {
-    fn DoNothing();
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
 }
