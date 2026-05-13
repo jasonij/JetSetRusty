@@ -266,13 +266,13 @@ fn do_rope_drawer() {
         if willy_moving {
             let dir = rope_get!(dir);
             let willy_dir = MINER_WILLY.lock().unwrap().dir;
-            let seg = unsafe { minerWillyRope } + ROPE_MOVE[(dir ^ willy_dir) as usize];
+            let seg = *MINER_WILLY_ROPE.lock().unwrap() + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
-            let level_dir = unsafe { Level_Dir(R_ABOVE) };
+            let level_dir = Level_Dir(R_ABOVE);
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
-                minerWillyRope = adjusted_seg;
+                *MINER_WILLY_ROPE.lock().unwrap() = adjusted_seg;
                 return;
             }
 
