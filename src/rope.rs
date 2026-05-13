@@ -17,11 +17,14 @@
 use crate::common::{MinerWilly, WIDTH};
 use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{video_draw_rope_seg, video_get_pixel, VIDEO_PIXEL};
-use std::sync::{LazyLock, Mutex};
 use std::cell::Cell;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 const ROPE_SEGS: i32 = 33;
+
+unsafe extern "C" {
+    fn DoNothing();
+}
 
 // ----------------------------------------------------------------------------
 // Rope animation data (immutable, no unsafe needed)
@@ -164,29 +167,29 @@ macro_rules! rope_set {
 // EVENT function pointers — exposed to C
 // ----------------------------------------------------------------------------
 
-use std::sync::LazyLock;
-
-static ROPE_TICKER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(Some(DoNothing)));
-static ROPE_DRAWER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(Some(DoNothing)));
+static ROPE_TICKER: LazyLock<Mutex<Option<extern "C" fn()>>> =
+    LazyLock::new(|| Mutex::new(Some(DoNothing)));
+static ROPE_DRAWER: LazyLock<Mutex<Option<extern "C" fn()>>> =
+    LazyLock::new(|| Mutex::new(Some(DoNothing)));
 
 // ----------------------------------------------------------------------------
 // Extern declarations — things still living in C
 // ----------------------------------------------------------------------------
 
-
 static MINER_WILLY_ROPE: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
-static MINER_WILLY: LazyLock<Mutex<MinerWilly>> = LazyLock::new(|| Mutex::new(MinerWilly {
-    x: 0,
-    y: 0,
-    tile: 0,
-    align: 0,
-    frame: 0,
-    dir: 0,
-    r#move: 0,
-    air: 0,
-    jump: 0,
-}));
-
+static MINER_WILLY: LazyLock<Mutex<MinerWilly>> = LazyLock::new(|| {
+    Mutex::new(MinerWilly {
+        x: 0,
+        y: 0,
+        tile: 0,
+        align: 0,
+        frame: 0,
+        dir: 0,
+        r#move: 0,
+        air: 0,
+        jump: 0,
+    })
+});
 
 // Level constants — verified against game.h, these are the rope rooms
 const B_WILLY: i32 = 4; // video.h
@@ -252,7 +255,8 @@ fn do_rope_drawer() {
             MINER_WILLY.lock().unwrap().x = if frame < 2 { willy_x } else { willy_x - 8 };
             MINER_WILLY.lock().unwrap().y = willy_y;
             MINER_WILLY.lock().unwrap().frame = frame;
-            MINER_WILLY.lock().unwrap().tile = MINER_WILLY.lock().unwrap().y / 8 * 32 + MINER_WILLY.lock().unwrap().x / 8;
+            MINER_WILLY.lock().unwrap().tile =
+                MINER_WILLY.lock().unwrap().y / 8 * 32 + MINER_WILLY.lock().unwrap().x / 8;
             MINER_WILLY.lock().unwrap().align = yalign(y);
         }
 
@@ -303,16 +307,17 @@ fn do_rope_ticker() {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rope_ticker_trampoline() {
     do_rope_ticker();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rope_drawer_trampoline() {
-// ----------------------------------------------------------------------------
+    do_rope_drawer();
+}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn Rope_Init() {
     let level = unsafe { gameLevel };
     let (x, ink) = match level {
@@ -334,12 +339,8 @@ pub extern "C" fn Rope_Init() {
     rope_set!(pos, 34);
     rope_set!(side, 0);
     rope_set!(hold, 0);
+}
 
-}
-#[no_mangle]
-pub extern "C" fn DoNothing() {
-    // Empty function
-}
 unsafe extern "C" {
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
