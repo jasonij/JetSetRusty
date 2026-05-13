@@ -295,17 +295,17 @@ fn do_rope_ticker() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn rope_ticker_trampoline() {
+#[no_mangle]
+pub extern "C" fn Rope_Ticker() {
     do_rope_ticker();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn rope_drawer_trampoline() {
+#[no_mangle]
+pub extern "C" fn Rope_Drawer() {
     do_rope_drawer();
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub extern "C" fn Rope_Init() {
     let level = unsafe { gameLevel };
     let (x, ink) = match level {
@@ -331,13 +331,13 @@ pub extern "C" fn Rope_Init() {
     ROPE.hold.store(0, Ordering::Relaxed);
 
     unsafe {
-        ROPE_TICKER = Some(rope_ticker_trampoline);
-        ROPE_DRAWER = Some(rope_drawer_trampoline);
+        ROPE_TICKER = Some(Rope_Ticker);
+        ROPE_DRAWER = Some(Rope_Drawer);
     }
 }
 
-unsafe extern "C" {
-    unsafe fn DoNothing();
+extern "C" {
+    fn DoNothing();
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
 }
