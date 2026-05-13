@@ -17,6 +17,7 @@
 use crate::common::{MinerWilly, WIDTH};
 use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{video_draw_rope_seg, video_get_pixel, VIDEO_PIXEL};
+use std::sync::{LazyLock, Mutex};
 use std::cell::Cell;
 
 const ROPE_SEGS: i32 = 33;
@@ -164,8 +165,8 @@ macro_rules! rope_set {
 
 use std::sync::LazyLock;
 
-static ROPE_TICKER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(None));
-static ROPE_DRAWER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(None));
+static ROPE_TICKER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(Some(DoNothing)));
+static ROPE_DRAWER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(Some(DoNothing)));
 
 // ----------------------------------------------------------------------------
 // Extern declarations — things still living in C
@@ -338,8 +339,6 @@ pub extern "C" fn Rope_Init() {
     rope_set!(side, 0);
     rope_set!(hold, 0);
 
-    *ROPE_TICKER.lock().unwrap() = Some(rope_ticker_trampoline);
-    *ROPE_DRAWER.lock().unwrap() = Some(rope_drawer_trampoline);
 }
 #[no_mangle]
 pub extern "C" fn DoNothing() {}
