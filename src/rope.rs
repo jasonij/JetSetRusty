@@ -311,7 +311,7 @@ extern "C" fn rope_drawer_trampoline() {
 // Public API
 // ----------------------------------------------------------------------------
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub extern "C" fn Rope_Init() {
     let level = unsafe { gameLevel };
     let (x, ink) = match level {
