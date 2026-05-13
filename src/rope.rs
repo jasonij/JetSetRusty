@@ -310,11 +310,6 @@ pub extern "C" fn rope_ticker_trampoline() {
 
 #[no_mangle]
 pub extern "C" fn rope_drawer_trampoline() {
-    do_rope_drawer();
-}
-
-// ----------------------------------------------------------------------------
-// Public API
 // ----------------------------------------------------------------------------
 
 #[no_mangle]
