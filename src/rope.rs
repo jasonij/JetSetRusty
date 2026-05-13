@@ -295,17 +295,17 @@ fn do_rope_ticker() {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn Rope_Ticker() {
     do_rope_ticker();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn Rope_Drawer() {
     do_rope_drawer();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn Rope_Init() {
     let level = unsafe { gameLevel };
     let (x, ink) = match level {
@@ -338,7 +338,7 @@ pub extern "C" fn Rope_Init() {
 
 extern "C" fn DoNothing() {}
 
-extern "C" {
+unsafe extern "C" {
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
 }
