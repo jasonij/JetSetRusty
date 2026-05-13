@@ -29,7 +29,6 @@ const ROPE_SEGS: i32 = 33;
 struct RopeData {
     x: i32,
     y: i32,
-}
 
 impl RopeData {
     const fn new(x: i32, y: i32) -> Self {
@@ -164,10 +163,10 @@ macro_rules! rope_set {
 
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 static Rope_Ticker: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(Box::into_raw(Box::new(None)));
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 static Rope_Drawer: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(Box::into_raw(Box::new(None)));
 
 // ----------------------------------------------------------------------------
@@ -176,13 +175,12 @@ static Rope_Drawer: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(B
 
 use std::sync::Mutex;
 
-static mut minerWillyRope: Mutex<i32> = Mutex::new(0);
-static mut minerWilly: Mutex<MinerWilly> = Mutex::new(MinerWilly::default());
+static MINER_WILLY_ROPE: Mutex<i32> = Mutex::new(0);
+static MINER_WILLY: Mutex<MinerWilly> = Mutex::new(MinerWilly::default());
 
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
     fn DoNothing();
-}
 
 // Level constants — verified against game.h, these are the rope rooms
 const B_WILLY: i32 = 4; // video.h
@@ -221,14 +219,14 @@ fn do_rope_drawer() {
 
         // Check for Willy collision
         let pixel_val = video_get_pixel(&mut pixels, pos);
-        let willy_rope_zero = unsafe { minerWillyRope == 0 };
+        let willy_rope_zero = *MINER_WILLY_ROPE.lock().unwrap() == 0;
         if willy_rope_zero && (pixel_val & B_WILLY) != 0 {
-            minerWillyRope = seg;
+            *MINER_WILLY_ROPE.lock().unwrap() = seg;
             rope_set!(hold, 1);
         }
 
         // Handle Willy position if holding rope
-        let willy_on_rope = unsafe { minerWillyRope == seg };
+        let willy_on_rope = *MINER_WILLY_ROPE.lock().unwrap() == seg;
         if willy_on_rope && rope_get!(hold) != 0 {
             let willy_x = x & 248;
             let willy_y = y - 8;
@@ -245,31 +243,29 @@ fn do_rope_drawer() {
                 }
             };
 
-            minerWilly.x = if frame < 2 { willy_x } else { willy_x - 8 };
-            minerWilly.y = willy_y;
-            minerWilly.frame = frame;
-            minerWilly.tile = minerWilly.y / 8 * 32 + minerWilly.x / 8;
-            minerWilly.align = yalign(y);
+            MINER_WILLY.lock().unwrap().x = if frame < 2 { willy_x } else { willy_x - 8 };
+            MINER_WILLY.lock().unwrap().y = willy_y;
+            MINER_WILLY.lock().unwrap().frame = frame;
+            MINER_WILLY.lock().unwrap().tile = MINER_WILLY.lock().unwrap().y / 8 * 32 + MINER_WILLY.lock().unwrap().x / 8;
+            MINER_WILLY.lock().unwrap().align = yalign(y);
         }
 
         video_draw_rope_seg(pos, ink);
     }
 
     // Handle negative minerWillyRope
-    if unsafe { minerWillyRope < 0 } {
-        unsafe {
-            minerWillyRope += 1;
-        }
+    if *MINER_WILLY_ROPE.lock().unwrap() < 0 {
+        *MINER_WILLY_ROPE.lock().unwrap() += 1;
         rope_set!(hold, 0);
         return;
     }
 
     // Handle rope movement when holding
     if rope_get!(hold) != 0 {
-        let willy_moving = unsafe { minerWilly.r#move != 0 };
+        let willy_moving = MINER_WILLY.lock().unwrap().r#move != 0;
         if willy_moving {
             let dir = rope_get!(dir);
-            let willy_dir = unsafe { minerWilly.dir };
+            let willy_dir = MINER_WILLY.lock().unwrap().dir;
             let seg = unsafe { minerWillyRope } + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
             let level_dir = unsafe { Level_Dir(R_ABOVE) };
@@ -280,9 +276,9 @@ fn do_rope_drawer() {
                 return;
             }
 
-            minerWillyRope = -16;
-            minerWilly.y &= 124;
-            minerWilly.air = 0;
+            *MINER_WILLY_ROPE.lock().unwrap() = -16;
+            MINER_WILLY.lock().unwrap().y &= 124;
+            MINER_WILLY.lock().unwrap().air = 0;
         }
     }
 }
@@ -301,12 +297,12 @@ fn do_rope_ticker() {
     }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 extern "C" fn rope_ticker_trampoline() {
     do_rope_ticker();
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 extern "C" fn rope_drawer_trampoline() {
     do_rope_drawer();
 }
