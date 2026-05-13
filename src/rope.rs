@@ -15,6 +15,7 @@
 /// ported over and we get to remove all the C FFI code.
 ///
 use crate::common::{MinerWilly, WIDTH};
+use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{video_draw_rope_seg, video_get_pixel, VIDEO_PIXEL};
 use std::cell::Cell;
 
@@ -193,11 +194,11 @@ unsafe extern "C" {
 // A is doctor Jones (level 41)
 // T is the bow (level 60)
 
-const QUIRKAFLEEG: i32 = 16; // g <return>
-const ONTHEROOF: i32 = 18; // i <return>
-const COLDSTORE: i32 = 25; // p <return>
-const SWIMMINGPOOL: i32 = 31; // @ <return>
-const THEBEACH: i32 = 57; // R <return>
+// g is quirkafleeg   (level 16)
+// i is on the roof   (level 18)
+// p in cold store    (level 25)
+// @ is swimming pool (level 31)
+// R is the beach     (level 57)
 
 const B_WILLY: i32 = 4; // video.h
 const R_ABOVE: i32 = 0; // game.h
