@@ -162,11 +162,13 @@ macro_rules! rope_set {
 // EVENT function pointers — exposed to C
 // ----------------------------------------------------------------------------
 
-#[unsafe(no_mangle)]
-pub static mut Rope_Ticker: Option<unsafe extern "C" fn()> = None;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 #[unsafe(no_mangle)]
-pub static mut Rope_Drawer: Option<unsafe extern "C" fn()> = None;
+static Rope_Ticker: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(&mut None);
+
+#[unsafe(no_mangle)]
+static Rope_Drawer: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(&mut None);
 
 // ----------------------------------------------------------------------------
 // Extern declarations — things still living in C
@@ -298,10 +300,12 @@ fn do_rope_ticker() {
     }
 }
 
+#[unsafe(no_mangle)]
 extern "C" fn rope_ticker_trampoline() {
     do_rope_ticker();
 }
 
+#[unsafe(no_mangle)]
 extern "C" fn rope_drawer_trampoline() {
     do_rope_drawer();
 }
@@ -320,8 +324,8 @@ pub extern "C" fn Rope_Init() {
         SWIMMINGPOOL => (16, 7u8),
         THEBEACH => (14, 5u8),
         _ => {
-            Rope_Ticker = Some(DoNothing);
-            Rope_Drawer = Some(DoNothing);
+            Rope_Ticker.store(&mut Some(DoNothing), Ordering::SeqCst);
+            Rope_Drawer.store(&mut Some(DoNothing), Ordering::SeqCst);
             return;
         }
     };
@@ -333,6 +337,6 @@ pub extern "C" fn Rope_Init() {
     rope_set!(side, 0);
     rope_set!(hold, 0);
 
-    Rope_Ticker = Some(rope_ticker_trampoline);
-    Rope_Drawer = Some(rope_drawer_trampoline);
+    Rope_Ticker.store(&mut Some(rope_ticker_trampoline), Ordering::SeqCst);
+    Rope_Drawer.store(&mut Some(rope_drawer_trampoline), Ordering::SeqCst);
 }
