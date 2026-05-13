@@ -5,7 +5,6 @@ use crate::common::{MinerWilly, WIDTH};
 use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{video_draw_rope_seg, video_get_pixel, VIDEO_PIXEL};
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::Mutex;
 
 const ROPE_SEGS: i32 = 33;
 
@@ -264,7 +263,7 @@ fn do_rope_drawer() {
             let seg =
                 MINER_WILLY_ROPE.load(Ordering::Relaxed) + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
-            let level_dir = unsafe { Level_Dir(R_ABOVE as i32) };
+            let level_dir = unsafe { Level_Dir(R_ABOVE) };
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
