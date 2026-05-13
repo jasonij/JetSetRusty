@@ -162,7 +162,7 @@ macro_rules! rope_set {
 // EVENT function pointers — exposed to C
 // ----------------------------------------------------------------------------
 
-use std::sync::{LazyLock, Mutex};
+use std::sync::LazyLock;
 
 static ROPE_TICKER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(None));
 static ROPE_DRAWER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(None));
@@ -171,7 +171,6 @@ static ROPE_DRAWER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| 
 // Extern declarations — things still living in C
 // ----------------------------------------------------------------------------
 
-use std::sync::Mutex;
 
 static MINER_WILLY_ROPE: Mutex<i32> = Mutex::new(0);
 static MINER_WILLY: Mutex<MinerWilly> = Mutex::new(MinerWilly {
@@ -273,7 +272,7 @@ fn do_rope_drawer() {
             let willy_dir = MINER_WILLY.lock().unwrap().dir;
             let seg = *MINER_WILLY_ROPE.lock().unwrap() + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
-            let level_dir = Level_Dir(R_ABOVE);
+            let level_dir = unsafe { Level_Dir(R_ABOVE) };
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
@@ -303,11 +302,13 @@ fn do_rope_ticker() {
 }
 
 #[no_mangle]
+#[allow(unsafe_code)]
 pub extern "C" fn rope_ticker_trampoline() {
     do_rope_ticker();
 }
 
 #[no_mangle]
+#[allow(unsafe_code)]
 pub extern "C" fn rope_drawer_trampoline() {
     do_rope_drawer();
 }
@@ -317,6 +318,7 @@ pub extern "C" fn rope_drawer_trampoline() {
 // ----------------------------------------------------------------------------
 
 #[no_mangle]
+#[allow(unsafe_code)]
 pub extern "C" fn Rope_Init() {
     let level = unsafe { gameLevel };
     let (x, ink) = match level {
@@ -343,7 +345,7 @@ pub extern "C" fn Rope_Init() {
     *ROPE_DRAWER.lock().unwrap() = Some(rope_drawer_trampoline);
 }
 extern "C" fn DoNothing() {}
-extern "C" {
+unsafe extern "C" {
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
 }
