@@ -172,8 +172,8 @@ static ROPE_DRAWER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| 
 // ----------------------------------------------------------------------------
 
 
-static MINER_WILLY_ROPE: Mutex<i32> = Mutex::new(0);
-static MINER_WILLY: Mutex<MinerWilly> = Mutex::new(MinerWilly {
+static MINER_WILLY_ROPE: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
+static MINER_WILLY: LazyLock<Mutex<MinerWilly>> = LazyLock::new(|| Mutex::new(MinerWilly {
     x: 0,
     y: 0,
     tile: 0,
@@ -183,7 +183,7 @@ static MINER_WILLY: Mutex<MinerWilly> = Mutex::new(MinerWilly {
     r#move: 0,
     air: 0,
     jump: 0,
-});
+}));
 
 
 // Level constants — verified against game.h, these are the rope rooms
@@ -302,13 +302,11 @@ fn do_rope_ticker() {
 }
 
 #[no_mangle]
-#[allow(unsafe_code)]
 pub extern "C" fn rope_ticker_trampoline() {
     do_rope_ticker();
 }
 
 #[no_mangle]
-#[allow(unsafe_code)]
 pub extern "C" fn rope_drawer_trampoline() {
     do_rope_drawer();
 }
@@ -318,7 +316,6 @@ pub extern "C" fn rope_drawer_trampoline() {
 // ----------------------------------------------------------------------------
 
 #[no_mangle]
-#[allow(unsafe_code)]
 pub extern "C" fn Rope_Init() {
     let level = unsafe { gameLevel };
     let (x, ink) = match level {
@@ -344,7 +341,8 @@ pub extern "C" fn Rope_Init() {
     *ROPE_TICKER.lock().unwrap() = Some(rope_ticker_trampoline);
     *ROPE_DRAWER.lock().unwrap() = Some(rope_drawer_trampoline);
 }
-extern "C" fn DoNothing() {}
+#[no_mangle]
+pub extern "C" fn DoNothing() {}
 unsafe extern "C" {
     static gameLevel: i32;
     fn Level_Dir(dir: i32) -> i32;
