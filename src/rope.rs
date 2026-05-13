@@ -29,12 +29,12 @@ const ROPE_SEGS: i32 = 33;
 struct RopeData {
     x: i32,
     y: i32,
+}
 
 impl RopeData {
     const fn new(x: i32, y: i32) -> Self {
         Self { x, y }
     }
-}
 }
 
 static ROPE_DATA: [RopeData; 86] = [
@@ -162,13 +162,10 @@ macro_rules! rope_set {
 // EVENT function pointers — exposed to C
 // ----------------------------------------------------------------------------
 
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::{LazyLock, Mutex};
 
-#[no_mangle]
-static Rope_Ticker: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(Box::into_raw(Box::new(None)));
-
-#[no_mangle]
-static Rope_Drawer: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(Box::into_raw(Box::new(None)));
+static ROPE_TICKER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(None));
+static ROPE_DRAWER: LazyLock<Mutex<Option<extern "C" fn()>>> = LazyLock::new(|| Mutex::new(None));
 
 // ----------------------------------------------------------------------------
 // Extern declarations — things still living in C
@@ -177,11 +174,18 @@ static Rope_Drawer: AtomicPtr<Option<unsafe extern "C" fn()>> = AtomicPtr::new(B
 use std::sync::Mutex;
 
 static MINER_WILLY_ROPE: Mutex<i32> = Mutex::new(0);
-static MINER_WILLY: Mutex<MinerWilly> = Mutex::new(MinerWilly::default());
+static MINER_WILLY: Mutex<MinerWilly> = Mutex::new(MinerWilly {
+    x: 0,
+    y: 0,
+    tile: 0,
+    align: 0,
+    frame: 0,
+    dir: 0,
+    r#move: 0,
+    air: 0,
+    jump: 0,
+});
 
-    static gameLevel: i32;
-    fn Level_Dir(dir: i32) -> i32;
-    fn DoNothing();
 
 // Level constants — verified against game.h, these are the rope rooms
 const B_WILLY: i32 = 4; // video.h
@@ -322,8 +326,8 @@ pub extern "C" fn Rope_Init() {
         SWIMMINGPOOL => (16, 7u8),
         THEBEACH => (14, 5u8),
         _ => {
-            Rope_Ticker.store(&mut Some(DoNothing), Ordering::SeqCst);
-            Rope_Drawer.store(&mut Some(DoNothing), Ordering::SeqCst);
+            *ROPE_TICKER.lock().unwrap() = Some(DoNothing);
+            *ROPE_DRAWER.lock().unwrap() = Some(DoNothing);
             return;
         }
     };
@@ -335,6 +339,11 @@ pub extern "C" fn Rope_Init() {
     rope_set!(side, 0);
     rope_set!(hold, 0);
 
-    Rope_Ticker.store(&mut Some(rope_ticker_trampoline), Ordering::SeqCst);
-    Rope_Drawer.store(&mut Some(rope_drawer_trampoline), Ordering::SeqCst);
+    *ROPE_TICKER.lock().unwrap() = Some(rope_ticker_trampoline);
+    *ROPE_DRAWER.lock().unwrap() = Some(rope_drawer_trampoline);
+}
+extern "C" fn DoNothing() {}
+extern "C" {
+    static gameLevel: i32;
+    fn Level_Dir(dir: i32) -> i32;
 }
