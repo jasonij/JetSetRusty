@@ -1,9 +1,9 @@
 #![allow(non_snake_case)]
 
 /// rope.rs - Modernized version with proper FFI safety
-use crate::common::{MinerWilly, WIDTH};
+use crate::common::{Event, MinerWilly, WIDTH};
 use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
-use crate::video::{video_draw_rope_seg, video_get_pixel, VIDEO_PIXEL};
+use crate::video::{video_draw_rope_seg, video_draw_rope_seg_inner, video_get_pixel, VIDEO_PIXEL};
 use std::sync::atomic::{AtomicI32, Ordering};
 
 const ROPE_SEGS: i32 = 33;
@@ -151,11 +151,13 @@ static ROPE: RopeState = RopeState {
 };
 
 // ----------------------------------------------------------------------------
-// FFI function pointers - stored as static Option
+// C-visible function pointer variables (game.c calls these indirectly)
 // ----------------------------------------------------------------------------
 
-static mut ROPE_TICKER: Option<extern "C" fn()> = None;
-static mut ROPE_DRAWER: Option<extern "C" fn()> = None;
+#[unsafe(no_mangle)]
+pub static mut Rope_Ticker: Event = None;
+#[unsafe(no_mangle)]
+pub static mut Rope_Drawer: Event = None;
 
 // ----------------------------------------------------------------------------
 // Extern declarations - the real C globals shared with levels.rs and the C code
@@ -240,7 +242,7 @@ fn do_rope_drawer() {
             }
         }
 
-        video_draw_rope_seg(pos, ink);
+        video_draw_rope_seg_inner(&mut pixels, pos, ink);
     }
 
     // Handle negative minerWillyRope
@@ -294,13 +296,11 @@ fn do_rope_ticker() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Rope_Ticker() {
+unsafe extern "C" fn rope_ticker_fn() {
     do_rope_ticker();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Rope_Drawer() {
+unsafe extern "C" fn rope_drawer_fn() {
     do_rope_drawer();
 }
 
@@ -315,8 +315,8 @@ pub extern "C" fn Rope_Init() {
         THEBEACH => (14, 5),
         _ => {
             unsafe {
-                ROPE_TICKER = Some(DoNothing);
-                ROPE_DRAWER = Some(DoNothing);
+                Rope_Ticker = Some(DoNothing);
+                Rope_Drawer = Some(DoNothing);
             }
             return;
         }
@@ -330,8 +330,8 @@ pub extern "C" fn Rope_Init() {
     ROPE.hold.store(0, Ordering::Relaxed);
 
     unsafe {
-        ROPE_TICKER = Some(Rope_Ticker);
-        ROPE_DRAWER = Some(Rope_Drawer);
+        Rope_Ticker = Some(rope_ticker_fn);
+        Rope_Drawer = Some(rope_drawer_fn);
     }
 }
 

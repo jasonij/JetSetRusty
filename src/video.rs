@@ -3,6 +3,7 @@
 use crate::common::{system_set_pixel, HEIGHT, WIDTH};
 
 use std::sync::LazyLock;
+use std::sync::Mutex;
 
 unsafe extern "C" {
     pub fn System_SetPixel(point: i32, index: i32);
@@ -341,9 +342,12 @@ pub fn video_pixel_fill(pos: i32, size: i32) {
 
 pub fn video_draw_rope_seg(pos: i32, ink: u8) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    video_draw_rope_seg_inner(&mut pixels, pos, ink);
+}
 
+pub fn video_draw_rope_seg_inner(pixels: &mut Vec<Pixel>, pos: i32, ink: u8) {
     pixels[pos as usize].point = 1;
-    video_set_pixel(&mut pixels, pos, ink);
+    video_set_pixel(pixels, pos, ink);
 }
 
 // robots.c
