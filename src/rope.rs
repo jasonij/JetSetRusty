@@ -173,11 +173,6 @@ unsafe extern "C" {
 const B_WILLY: i32 = 4;
 const R_ABOVE: i32 = 0;
 
-#[inline]
-fn yalign(y: i32) -> i32 {
-    y & !7
-}
-
 // ----------------------------------------------------------------------------
 // Internal implementation
 // ----------------------------------------------------------------------------
@@ -238,7 +233,7 @@ fn do_rope_drawer() {
                 minerWilly.y = willy_y;
                 minerWilly.frame = frame;
                 minerWilly.tile = minerWilly.y / 8 * 32 + minerWilly.x / 8;
-                minerWilly.align = yalign(y);
+                minerWilly.align = 4;
             }
         }
 
