@@ -1,3 +1,4 @@
+#![allow(non_snake_case, unused)]
 use crate::common::WIDTH;
 use crate::misc::Timer;
 use std::sync::atomic::{AtomicI32, AtomicU8, Ordering};
@@ -66,9 +67,10 @@ pub enum ConveyorDir {
     Right,
 }
 
-// Miner struct (from game.h)
+// miner struct (from game.h)
 #[derive(Debug)]
 pub struct Miner {
+    // Initialize to all zeros
     pub x: i32,
     pub y: i32,
     pub tile: i32,
@@ -80,129 +82,48 @@ pub struct Miner {
     pub jump: i32,
 }
 
-// Public static variables (from game.h)
-pub static mut MINER_WILLY: Miner = Miner {
-    x: 0,
-    y: 0,
-    tile: 0,
-    align: 0,
-    frame: 0,
-    dir: 0,
-    move_: 0,
-    air: 0,
-    jump: 0,
-};
-
-pub static mut MINER_WILLY_ROPE: i32 = 0;
-pub static mut GAME_MODE: AtomicI32 = AtomicI32::new(GameMode::Normal as i32);
-pub static mut GAME_PAUSED: AtomicI32 = AtomicI32::new(0);
-pub static mut GAME_LIVES: AtomicI32 = AtomicI32::new(0);
-pub static mut ITEM_COUNT: AtomicI32 = AtomicI32::new(0);
-pub static mut CHEAT_ENABLED: AtomicI32 = AtomicI32::new(0);
-
-// Game state structure (private)
-struct GameState {
-    // Atomic fields (cheap access)
-    music: AtomicU8,
-    inactivity_timer: AtomicI32,
-    frame: AtomicI32,
-    paused: AtomicI32,
-    level: AtomicI32,
-    lives: AtomicI32,
-    clock_ticks: AtomicI32,
-    mode: AtomicU8,
-    item_count: AtomicI32,
-
-    // Mutex-protected fields (more expensive)
-    level_border: Mutex<[i32; 60]>,
-    score_clock: Mutex<[u8; 3]>,
-    score_items: Mutex<u8>,
-    timer: Mutex<Timer>,
+pub struct Flags {
+    pub cheat_enabled: bool,
+    pub game_paused: bool,
 }
 
+// Game state structure (private)
+pub struct GameState {
+    pub miner: Mutex<Miner>,
+
+    // Frequently accessed, thread-safe, atomic fields (cheap access)
+    pub cheat_enabled: AtomicI32,
+    pub clock_ticks: AtomicI32,
+    pub frame: AtomicI32,
+    pub inactivity_timer: AtomicI32,
+    pub item_count: AtomicI32,
+    pub level: AtomicI32,
+    pub lives: AtomicI32,
+    pub miner_willy_rope: AtomicI32,
+    pub mode: AtomicU8,
+    pub music: AtomicU8,
+    pub paused: AtomicI32,
+
+    // How to use enums in Atomics:
+    // MY_ENUM.store(MyEnum::B as i32, Ordering::Release);
+    // let val = MyEnum::from_repr(MY_ENUM.load(Ordering::Acquire)).unwrap();
+
+    // Less frequent, needs interior mutability, mutex-protected fields (more expensive)
+    pub level_border: Mutex<[i32; 60]>,
+    pub score_clock: Mutex<[u8; 3]>,
+    pub score_items: Mutex<u8>,
+    pub timer: Mutex<Timer>,
+}
+
+// Let's only do these for complicated ones
 impl GameState {
     // Atomic operations (very fast)
     pub fn increment_clock_ticks(&self) {
         self.clock_ticks.fetch_add(1, Ordering::Relaxed);
     }
-
-    pub fn get_clock_ticks(&self) -> i32 {
-        self.clock_ticks.load(Ordering::Relaxed)
-    }
-
-    pub fn set_clock_ticks(&self, value: i32) {
-        self.clock_ticks.store(value, Ordering::Relaxed);
-    }
-
-    pub fn get_frame(&self) -> i32 {
-        self.frame.load(Ordering::Relaxed)
-    }
-
-    pub fn set_frame(&self, value: i32) {
-        self.frame.store(value, Ordering::Relaxed);
-    }
-
-    pub fn get_paused(&self) -> i32 {
-        self.paused.load(Ordering::Relaxed)
-    }
-
-    pub fn set_paused(&self, value: i32) {
-        self.paused.store(value, Ordering::Relaxed);
-    }
-
-    pub fn get_level(&self) -> i32 {
-        self.level.load(Ordering::Relaxed)
-    }
-
-    pub fn set_level(&self, value: i32) {
-        self.level.store(value, Ordering::Relaxed);
-    }
-
-    pub fn get_lives(&self) -> i32 {
-        self.lives.load(Ordering::Relaxed)
-    }
-
-    pub fn set_lives(&self, value: i32) {
-        self.lives.store(value, Ordering::Relaxed);
-    }
-
-    pub fn get_mode(&self) -> u8 {
-        self.mode.load(Ordering::Relaxed)
-    }
-
-    pub fn set_mode(&self, value: u8) {
-        self.mode.store(value, Ordering::Relaxed);
-    }
-
-    pub fn get_item_count(&self) -> i32 {
-        self.item_count.load(Ordering::Relaxed)
-    }
-
     pub fn increment_item_count(&self) {
         self.item_count.fetch_add(1, Ordering::Relaxed);
     }
-
-    // Mutex operations (more expensive)
-    pub fn get_level_border(&self) -> [i32; 60] {
-        *self.level_border.lock().unwrap()
-    }
-
-    pub fn set_level_border(&self, value: [i32; 60]) {
-        *self.level_border.lock().unwrap() = value;
-    }
-
-    pub fn get_score_clock(&self) -> [u8; 3] {
-        *self.score_clock.lock().unwrap()
-    }
-
-    pub fn set_score_clock(&self, value: [u8; 3]) {
-        *self.score_clock.lock().unwrap() = value;
-    }
-
-    pub fn get_score_items(&self) -> u8 {
-        *self.score_items.lock().unwrap()
-    }
-
     pub fn increment_score_items(&self) {
         let mut items = self.score_items.lock().unwrap();
         *items += 1;
@@ -213,7 +134,10 @@ impl GameState {
         self.timer.lock().unwrap().clone()
     }
 
-    pub fn update_timer<F>(&self, f: F) where F: FnOnce(&mut Timer) {
+    pub fn update_timer<F>(&self, f: F)
+    where
+        F: FnOnce(&mut Timer),
+    {
         let mut timer = self.timer.lock().unwrap();
         f(&mut *timer);
     }
@@ -249,6 +173,7 @@ pub fn Game_CheatEnabled() {
 }
 
 // Cheat system
+// TODO: Add to GameState, along with other static muts
 pub static mut CHEAT_RESPONDER: Option<extern "C" fn() -> ()> = None;
 
 pub fn Cheat_Disabled() {
