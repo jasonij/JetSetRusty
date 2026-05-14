@@ -5023,6 +5023,9 @@ pub unsafe extern "C" fn Level_GetTileRamp(tile: usize) -> TileType {
 }
 
 fn level_get_tile_ramp(tile: usize) -> TileType {
+    if tile >= LEVEL_TILES {
+        return TileType::Space;
+    }
     match unsafe { LEVEL_TILE[tile].tile_type } {
         TileType::RampLC => TileType::RampL,
         TileType::RampRC => TileType::RampR,
@@ -5036,6 +5039,9 @@ pub unsafe extern "C" fn Level_GetTileType(tile: usize) -> TileType {
 }
 
 fn level_get_tile_type(tile: usize) -> TileType {
+    if tile >= LEVEL_TILES {
+        return TileType::Space;
+    }
     unsafe {
         match LEVEL_TILE[tile].tile_type {
             TileType::RampLC => TileType::ConveyR,
