@@ -6,8 +6,8 @@ use sdl2::sys as sdl;
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 
-const SAMPLERATE: i32 = 22050;
-const TICKRATE: i32 = 60;
+pub const SAMPLERATE: i32 = 22050;
+pub const TICKRATE: i32 = 60;
 
 // SDL key code table indexed by Key enum discriminant (Key::Left=0 .. Key::T=35)
 const SDL_KEYS: [sdl::SDL_Keycode; 36] = [

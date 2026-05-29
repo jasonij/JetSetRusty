@@ -5107,7 +5107,7 @@ pub unsafe extern "C" fn Level_Drawer() {
     level_drawer();
 }
 
-fn level_init() {
+pub fn level_init() {
     let level_idx = game_level();
     let level = unsafe { &ACTIVE_LEVELS[level_idx] };
 
