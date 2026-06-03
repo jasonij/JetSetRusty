@@ -27,12 +27,26 @@ fn main() {
     }
 
     // pants
+    let c_sources = ["src/game.c", "src/miner.c", "src/robots.c"];
+    for src in &c_sources {
+        build.file(src);
+    }
     build
         .define("BUILD", build_string.as_str())
-        .file("src/game.c")
-        .file("src/miner.c")
-        .file("src/robots.c")
         .compile("jetsetrusty");
+
+    // Recompile the C side when any of its sources or headers change. Without
+    // these, Cargo only re-runs build.rs on a coarse package scan and the .c
+    // objects can go stale (e.g. de-static'ing a global doesn't take effect).
+    for src in &c_sources {
+        println!("cargo:rerun-if-changed={src}");
+    }
+    for entry in std::fs::read_dir("src").expect("read src/") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().is_some_and(|e| e == "h") {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
 
     println!("cargo:rustc-link-lib=SDL2");
     println!("cargo:rustc-link-lib=SDL2_mixer");

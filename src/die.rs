@@ -1,6 +1,7 @@
 #![allow(non_snake_case, dead_code, non_upper_case_globals)]
 
 use crate::common::{MinerWilly, WIDTH};
+use crate::game::Game_Action;
 use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
 
 unsafe extern "C" {
@@ -12,7 +13,6 @@ unsafe extern "C" {
     static mut Responder: Option<unsafe extern "C" fn()>;
     static mut minerWilly: MinerWilly;
     fn Gameover_Action();
-    fn Game_Action();
     fn DoNothing();
     fn Miner_Restore();
     fn Audio_ReduceMusicSpeed();

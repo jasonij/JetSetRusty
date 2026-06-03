@@ -62,15 +62,22 @@ unsafe extern "C" {
 
 #[unsafe(no_mangle)]
 pub static mut Action: Event = Some(Loader_Action);
+
 #[unsafe(no_mangle)]
 pub static mut Responder: Event = None;
+
 #[unsafe(no_mangle)]
 pub static mut Ticker: Event = None;
+
 #[unsafe(no_mangle)]
 pub static mut Drawer: Event = None;
 
 #[unsafe(no_mangle)]
+pub static mut DoClockUpdate: Event = None;
+
+#[unsafe(no_mangle)]
 pub static mut gameInput: i32 = Key::None as i32;
+
 #[unsafe(no_mangle)]
 pub static mut videoFlash: i32 = 0;
 

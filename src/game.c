@@ -4,9 +4,9 @@
 
 #include "game.h"
 
-static int      gameMusic = MUS_PLAY;
+int             gameMusic = MUS_PLAY;
 
-static int      levelBorder[] =
+int             levelBorder[] =
 {
     5, 4, 6, 2, 3, 1, 2, 1, 4, 2,
     2, 4, 6, 5, 1, 3, 2, 1, 2, 1,
@@ -16,16 +16,16 @@ static int      levelBorder[] =
     5, 2, 1, 2, 5, 1, 2, 2, 5, 5
 };
 
-static char     gameScoreItems;
-static char     gameScoreClock[3];
+char            gameScoreItems;
+char            gameScoreClock[3];
 static EVENT    DoClockUpdate;
 
-static int      gameInactivityTimer;
+int             gameInactivityTimer;
 
 static u8       lifeInk[] = {0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7};
 
 int      gameFrame;
-static TIMER    gameTimer;
+TIMER           gameTimer;
 
 int             gamePaused = 0;
 int             gameLevel;
@@ -35,7 +35,7 @@ int             gameMode;
 
 int             itemCount;
 
-static void DoDrawClock()
+void DoDrawClock()
 {
     char    text[24] = "\x1\x0\x2\x7" " " "\x2\x6" " " "\x2\x5" ":" "\x2\x4" " " "\x2\x3" " " "\x2\x2" " " "\x2\x1" "m";
 
@@ -141,7 +141,7 @@ void Game_ChangeLevel(int dir)
     Game_InitRoom();
 }
 
-static void ClockTicker()
+void ClockTicker()
 {
     // 256 frames = 1 game minute
     // 19 game hours = 6.75... actual hours (19 * 60 * 256 / 12 / 60 / 60)
@@ -191,7 +191,7 @@ void Game_GotItem()
     Audio_Sfx(SFX_ITEM);
 }
 
-static void DoPauseDrawer()
+void DoPauseDrawer()
 {
     if (gamePaused == 16 * 5)
     {
@@ -200,7 +200,7 @@ static void DoPauseDrawer()
     }
 }
 
-static void DoPauseTicker()
+void DoPauseTicker()
 {
     if (gamePaused++ == 16 * 5)
     {
@@ -208,7 +208,7 @@ static void DoPauseTicker()
     }
 }
 
-static void DoGameDrawer()
+void DoGameDrawer()
 {
     if (gameMusic == MUS_PLAY)
     {
@@ -234,14 +234,14 @@ static void DoGameDrawer()
     DoClockUpdate();
 }
 
-static void DoDrawOnce()
+void DoDrawOnce()
 {
     DoGameDrawer();
 
     Drawer = DoNothing;
 }
 
-static void DoGameTicker()
+void DoGameTicker()
 {
     if (gameMusic == MUS_STOP && gameInactivityTimer++ == 256 * 5 && gameMode < GM_RUNNING)
     {
@@ -436,7 +436,7 @@ void Game_GameReset()
     Audio_Music(MUS_GAME, gameMusic);
 }
 
-void Game_Action()
+void Game_Action_ORIG()
 {
     Responder = DoGameResponder;
     Ticker = Game_InitRoom;

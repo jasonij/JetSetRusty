@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
+use crate::game::Miner;
 use crate::levels;
+use crate::misc::Timer;
 
 // Screen dimensions, i32 as per original C
 pub const WIDTH: i32 = 256;
@@ -80,15 +82,14 @@ pub enum Key {
 
 // Globals defined in game_main.rs, re-exported here for convenience
 pub use crate::game_main::{
-    Action, Drawer, Responder, Ticker, gameInput, videoFlash,
-    DoNothing, DoQuit, System_Rnd, System_SetPixel,
+    gameInput, videoFlash, Action, DoNothing, DoQuit, Drawer, Responder, System_Rnd,
+    System_SetPixel, Ticker,
 };
 
 // Forward declarations of remaining C functions
 unsafe extern "C" {
     pub fn Codes_Action();
     pub fn Title_Action();
-    pub fn Game_Action();
     pub fn Die_Action();
     pub fn Gameover_Action();
 }
@@ -100,4 +101,51 @@ pub unsafe extern "C" fn Level_SetBorder() {
 
 pub fn system_set_pixel(pos: i32, ink: i32) {
     System_SetPixel(pos, ink)
+}
+
+// These `c_*` bindings alias the live C globals (see game.c / miner.c) via
+// `#[link_name]`, so the Rust `GAME_STATE` mirror and the still-C handlers
+// (DoGameTicker, DoGameDrawer, miner.c, robots.c) read and write the same
+// storage. `gameMode`/`gameMusic` are `int` in C — keep them i32 here so we
+// write the full word, and cast at the AtomicU8 boundary in game.rs.
+// `cheatEnabled` is deliberately absent: it is Rust-owned (cheat.rs) and C
+// merely `extern`s it, so it is already a single shared symbol.
+unsafe extern "C" {
+    // Game state
+    #[link_name = "gameLevel"]
+    pub static mut c_game_level: i32;
+    #[link_name = "gameLives"]
+    pub static mut c_game_lives: i32;
+    #[link_name = "gameMode"]
+    pub static mut c_game_mode: i32;
+    #[link_name = "gameMusic"]
+    pub static mut c_game_music: i32;
+    #[link_name = "gamePaused"]
+    pub static mut c_game_paused: i32;
+    #[link_name = "gameClockTicks"]
+    pub static mut c_game_clock_ticks: i32;
+    #[link_name = "gameFrame"]
+    pub static mut c_game_frame: i32;
+    #[link_name = "gameInactivityTimer"]
+    pub static mut c_game_inactivity_timer: i32;
+    #[link_name = "itemCount"]
+    pub static mut c_item_count: i32;
+    #[link_name = "minerAttrSplit"]
+    pub static mut c_miner_attr_split: i32;
+    #[link_name = "minerWillyRope"]
+    pub static mut c_miner_willy_rope: i32;
+
+    // Arrays
+    #[link_name = "levelBorder"]
+    pub static mut c_level_border: [i32; 60];
+    #[link_name = "gameScoreClock"]
+    pub static mut c_game_score_clock: [u8; 3];
+    #[link_name = "gameScoreItems"]
+    pub static mut c_game_score_items: u8;
+
+    // Structs
+    #[link_name = "gameTimer"]
+    pub static mut c_game_timer: Timer;
+    #[link_name = "minerWilly"]
+    pub static mut c_miner_willy: Miner;
 }
