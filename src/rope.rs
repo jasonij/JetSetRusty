@@ -156,6 +156,7 @@ static ROPE: RopeState = RopeState {
 
 #[unsafe(no_mangle)]
 pub static mut Rope_Ticker: Event = None;
+
 #[unsafe(no_mangle)]
 pub static mut Rope_Drawer: Event = None;
 

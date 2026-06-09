@@ -1,9 +1,9 @@
 #![allow(unused)]
-use crate::audio::{Audio_Play, MUS_STOP};
+use crate::audio::{Audio_Play, MUS_PLAY, MUS_STOP};
 use crate::cheat::Cheat_Responder;
 use crate::game_main::gameInput;
 use crate::gameover::Gameover_Action;
-use crate::levels;
+use crate::levels::{self, Level_Drawer};
 use crate::misc::Timer;
 use crate::rope;
 
@@ -26,7 +26,6 @@ use crate::common::{
     c_miner_attr_split,
     c_miner_willy,
     c_miner_willy_rope,
-
     // Types
     Event,
     Key,
@@ -77,8 +76,11 @@ unsafe extern "C" {
     fn DoGameTicker();
     fn DoPauseDrawer();
     fn DoPauseTicker();
+    fn GameDrawLives();
     fn Game_DrawStatus();
+    fn Miner_Drawer();
     fn Miner_Save();
+    fn Robots_Drawer();
     fn Robots_Init();
     fn System_Border(x: i32);
 }
@@ -197,6 +199,53 @@ impl GameState {
     {
         let mut timer = self.timer.lock().unwrap();
         f(&mut *timer);
+    }
+}
+
+// WARN: LLM Slop for debugging purposes
+impl std::fmt::Display for GameState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let cheat_enabled = self.cheat_enabled.load(Ordering::Relaxed);
+        let clock_ticks = self.clock_ticks.load(Ordering::Relaxed);
+        let frame = self.frame.load(Ordering::Relaxed);
+        let game_paused = self.game_paused.load(Ordering::Relaxed);
+        let inactivity_timer = self.inactivity_timer.load(Ordering::Relaxed);
+        let item_count = self.item_count.load(Ordering::Relaxed);
+        let level = self.level.load(Ordering::Relaxed);
+        let lives = self.lives.load(Ordering::Relaxed);
+        let miner_attr_split = self.miner_attr_split.load(Ordering::Relaxed);
+        let miner_willy_rope = self.miner_willy_rope.load(Ordering::Relaxed);
+        let mode = self.mode.load(Ordering::Relaxed);
+        let music = self.music.load(Ordering::Relaxed);
+
+        let miner = self.miner.lock().unwrap();
+        let level_border = self.level_border.lock().unwrap();
+        let score_clock = self.score_clock.lock().unwrap();
+        let score_items = self.score_items.lock().unwrap();
+        let timer = self.timer.lock().unwrap();
+
+        // This is so ugly
+        write!(
+            f,
+            "GameState {{\n  cheat_enabled: {},\n  clock_ticks: {},\n  frame: {},\n  game_paused: {},\n  inactivity_timer: {},\n  item_count: {},\n  level: {},\n  lives: {},\n  miner_attr_split: {},\n  miner_willy_rope: {},\n  mode: {},\n  music: {},\n  miner: {:?},\n  level_border: {:?},\n  score_clock: {:?},\n  score_items: {},\n  timer: {:?}\n}}",
+            cheat_enabled,
+            clock_ticks,
+            frame,
+            game_paused,
+            inactivity_timer,
+            item_count,
+            level,
+            lives,
+            miner_attr_split,
+            miner_willy_rope,
+            mode,
+            music,
+            *miner,
+            *level_border,
+            *score_clock,
+            *score_items,
+            *timer
+        )
     }
 }
 
@@ -362,12 +411,54 @@ pub extern "C" fn do_game_responder() {
     sync_rust_to_c();
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn do_game_drawer() {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+
+    if (game.music.load(Ordering::Relaxed) == MUS_PLAY as u8) {
+        unsafe {
+            GameDrawLives();
+        }
+    }
+
+    if (game.frame.load(Ordering::Relaxed) == 0) {
+        return;
+    }
+
+    // WARN: This maybe should be lower
+    // TODO: Test the victory sequence!
+    if (game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8) {
+        return;
+    }
+
+    unsafe {
+        sync_rust_to_c();
+        Level_Drawer();
+        Robots_Drawer();
+        Miner_Drawer();
+
+        // Remember we've got function-pointer globals, so let's remember this
+        // pattern and not accidentally jump into the variable's storage
+        if let Some(func) = rope::Rope_Drawer {
+            func();
+        }
+        if let Some(func) = DO_CLOCK_UPDATE {
+            func();
+        }
+
+        sync_c_to_rust();
+    }
+}
+
 // Ported from C's ClockTicker, but NOT yet wired in: the live game loop is still
 // C's DoGameTicker, which calls C's ClockTicker (game.c). Hook this up when
 // DoGameTicker itself is ported — and note it reads/writes GAME_STATE, so it'll
 // need the sync bookends (or to run inside an already-synced Rust ticker).
 #[unsafe(no_mangle)]
 pub extern "C" fn clock_ticker() {
+    sync_c_to_rust();
+
     // [ed: porting comments over directly]
     // 256 frames = 1 game minute
     // 19 game hours = 6.75... actual hours (19 * 60 * 256 / 12 / 60 / 60)
@@ -402,6 +493,7 @@ pub extern "C" fn clock_ticker() {
     unsafe {
         DO_CLOCK_UPDATE = Some(DoDrawClock);
     }
+    sync_rust_to_c();
 }
 
 fn sync_rust_to_c() {
@@ -435,7 +527,9 @@ fn sync_c_to_rust() {
         GAME_STATE.level.store(c_game_level, Ordering::Relaxed);
         GAME_STATE.lives.store(c_game_lives, Ordering::Relaxed);
         GAME_STATE.mode.store(c_game_mode as u8, Ordering::Relaxed);
-        GAME_STATE.music.store(c_game_music as u8, Ordering::Relaxed);
+        GAME_STATE
+            .music
+            .store(c_game_music as u8, Ordering::Relaxed);
         GAME_STATE
             .game_paused
             .store(c_game_paused != 0, Ordering::Relaxed);
@@ -469,15 +563,21 @@ fn sync_c_to_rust() {
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
 pub extern "C" fn Game_Action() {
+    let game = &*GAME_STATE;
+    println!("{}", game);
+    println!("Responder");
     unsafe {
         Responder = Some(do_game_responder);
     }
+    println!("Ticker");
     unsafe {
         // Runs once next frame, inits the room, then installs DoGameTicker and
         // sets Action = DoNothing. Matches C's `Ticker = Game_InitRoom`.
         Ticker = Some(game_init_room);
     }
+    println!("Drawer");
     unsafe {
-        Drawer = Some(DoGameDrawer);
+        Drawer = Some(do_game_drawer);
+        println!("Drawer -- Exit");
     }
 }

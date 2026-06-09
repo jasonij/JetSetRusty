@@ -66,7 +66,7 @@ static void DrawItems()
     Video_WriteLarge(6 * 8 + 4, STATUS, text);
 }
 
-static void GameDrawLives()
+void GameDrawLives()
 {
     int l;
 

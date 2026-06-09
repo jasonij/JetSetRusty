@@ -120,6 +120,17 @@ pub struct Timer {
     pub divisor: i32,
 }
 
+impl std::fmt::Debug for Timer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Timer")
+            .field("acc", &self.acc)
+            .field("rate", &self.rate)
+            .field("remainder", &self.remainder)
+            .field("divisor", &self.divisor)
+            .finish()
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn Timer_Set(timer: *mut Timer, numerator: i32, divisor: i32) {
     let t = unsafe { &mut *timer };
