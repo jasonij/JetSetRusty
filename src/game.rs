@@ -420,9 +420,7 @@ pub extern "C" fn do_game_drawer() {
     let game = &*GAME_STATE;
 
     if (game.music.load(Ordering::Relaxed) == MUS_PLAY as u8) {
-        unsafe {
-            GameDrawLives();
-        }
+        game_draw_lives();
     }
 
     if (game.frame.load(Ordering::Relaxed) == 0) {
@@ -499,8 +497,7 @@ pub extern "C" fn clock_ticker() {
     sync_rust_to_c();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn GameDrawLives() {
+pub fn game_draw_lives() {
     sync_c_to_rust();
     let game = &*GAME_STATE;
     let lives = game.lives.load(Ordering::Relaxed) as usize;
@@ -512,6 +509,11 @@ pub extern "C" fn GameDrawLives() {
         }
     }
     sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn GameDrawLives() {
+    game_draw_lives();
 }
 
 fn sync_rust_to_c() {

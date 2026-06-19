@@ -59,6 +59,7 @@ void Game_GameReset(void);
 void Game_DrawStatus(void);
 void Game_Pause(int);
 void Game_CheatEnabled(void);
+void GameDrawLives(void);
 
 // cheat
 extern int      cheatEnabled;

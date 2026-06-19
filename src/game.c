@@ -22,8 +22,6 @@ static EVENT    DoClockUpdate;
 
 int             gameInactivityTimer;
 
-static u8       lifeInk[] = {0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7};
-
 int      gameFrame;
 TIMER           gameTimer;
 
@@ -66,15 +64,6 @@ static void DrawItems()
     Video_WriteLarge(6 * 8 + 4, STATUS, text);
 }
 
-void GameDrawLives()
-{
-    int l;
-
-    for (l = 0; l < gameLives; l++)
-    {
-        Miner_DrawSeqSprite(LIVES + l * 16, 0x0, lifeInk[l]);
-    }
-}
 
 void Game_DrawStatus()
 {
