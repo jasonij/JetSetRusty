@@ -51,33 +51,6 @@ void DoDrawClock()
     DoClockUpdate = DoNothing;
 }
 
-static void DrawItems()
-{
-    char    text[9] = "\x1\x0\x2\x6" " " "\x2\x7" " ";
-
-    text[7] = (gameScoreItems % 10) + '0';
-    if (gameScoreItems > 9)
-    {
-        text[4] = (gameScoreItems / 10) + '0';
-    }
-
-    Video_WriteLarge(6 * 8 + 4, STATUS, text);
-}
-
-
-void Game_DrawStatus()
-{
-    Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
-    Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
-
-    Video_WriteLarge(4, STATUS, "\x1\x0\x2\x1" "I" "\x2\x2" "t" "\x2\x3" "e" "\x2\x4" "m" "\x2\x5" "s");
-    DrawItems();
-
-    DoDrawClock();
-
-    GameDrawLives();
-}
-
 void Game_ChangeLevel(int dir)
 {
     int     level = Level_Dir(dir);
@@ -169,7 +142,7 @@ void ClockTicker()
 void Game_GotItem()
 {
     gameScoreItems++;
-    DrawItems();
+    Game_DrawStatus();
 
     if (--itemCount == 0)
     {

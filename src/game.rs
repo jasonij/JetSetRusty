@@ -6,6 +6,7 @@ use crate::gameover::Gameover_Action;
 use crate::levels::{self, Level_Drawer};
 use crate::misc::Timer;
 use crate::rope;
+use crate::video::{Video_PixelInkFill, Video_PixelPaperFill, Video_WriteLarge};
 
 use crate::cheat::cheatEnabled;
 use crate::common::{
@@ -79,7 +80,6 @@ unsafe extern "C" {
     fn DoGameTicker();
     fn DoPauseDrawer();
     fn DoPauseTicker();
-    fn Game_DrawStatus();
     fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8);
     fn Miner_Drawer();
     fn Miner_Save();
@@ -362,7 +362,7 @@ pub fn game_pause(state: bool) {
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
         if (game.cheat_enabled.load(Ordering::Relaxed)) {
-            unsafe { Game_DrawStatus() };
+            game_draw_status();
             unsafe {
                 System_Border(
                     game.level_border.lock().unwrap()[game.level.load(Ordering::Relaxed) as usize],
@@ -514,6 +514,56 @@ pub fn game_draw_lives() {
 #[unsafe(no_mangle)]
 pub extern "C" fn GameDrawLives() {
     game_draw_lives();
+}
+
+pub fn game_draw_status() {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+    
+    // Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
+    unsafe {
+        Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
+    }
+    
+    // Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
+    unsafe {
+        Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
+    }
+    
+    // Video_WriteLarge(4, STATUS, "\x1\x0\x2\x1" "I" "\x2\x2" "t" "\x2\x3" "e" "\x2\x4" "m" "\x2\x5" "s");
+    // Using vec! for the byte string as requested
+    let items_label: Vec<u8> = vec![0x1, 0x0, 0x2, 0x1, b'I', 0x2, 0x2, b't', 0x2, 0x3, b'e', 0x2, 0x4, b'm', 0x2, 0x5, b's', 0];
+    unsafe {
+        Video_WriteLarge(4, STATUS as i32, items_label.as_ptr() as *const i8);
+    }
+    
+    // DrawItems() equivalent
+    let score_items = *game.score_items.lock().unwrap();
+    let mut items_text: Vec<u8> = vec![0x1, 0x0, 0x2, 0x6, b' ', 0x2, 0x7, b' ', 0];
+    
+    items_text[7] = (score_items % 10) + b'0';
+    if score_items > 9 {
+        items_text[4] = (score_items / 10) + b'0';
+    }
+    
+    unsafe {
+        Video_WriteLarge(6 * 8 + 4, STATUS as i32, items_text.as_ptr() as *const i8);
+    }
+    
+    // DoDrawClock();
+    unsafe {
+        DoDrawClock();
+    }
+    
+    // GameDrawLives();
+    game_draw_lives();
+    
+    sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn Game_DrawStatus() {
+    game_draw_status();
 }
 
 fn sync_rust_to_c() {
