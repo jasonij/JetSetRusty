@@ -63,6 +63,9 @@ pub const THEBATHROOM: i32 = 33;
 pub const MASTERBEDROOM: i32 = 35;
 pub const THEBEACH: i32 = 57;
 
+// Life ink colors for drawing lives
+const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
+
 // Static callback variable(s)
 pub static mut DO_CLOCK_UPDATE: Option<unsafe extern "C" fn() -> ()> = None;
 pub static mut ROPE_DRAWER: Option<extern "C" fn() -> ()> = None;
@@ -76,8 +79,8 @@ unsafe extern "C" {
     fn DoGameTicker();
     fn DoPauseDrawer();
     fn DoPauseTicker();
-    fn GameDrawLives();
     fn Game_DrawStatus();
+    fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8);
     fn Miner_Drawer();
     fn Miner_Save();
     fn Robots_Drawer();
@@ -492,6 +495,21 @@ pub extern "C" fn clock_ticker() {
 
     unsafe {
         DO_CLOCK_UPDATE = Some(DoDrawClock);
+    }
+    sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn GameDrawLives() {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+    let lives = game.lives.load(Ordering::Relaxed) as usize;
+
+    for l in 0..lives {
+        let pos = LIVES + l * 16;
+        unsafe {
+            Miner_DrawSeqSprite(pos as i32, 0x0, LIFE_INK[l]);
+        }
     }
     sync_rust_to_c();
 }
