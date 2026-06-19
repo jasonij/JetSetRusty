@@ -1,6 +1,6 @@
-use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
+use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
 use crate::cheat::cheatEnabled;
-use crate::common::{gameInput, videoFlash, Action, Drawer, Key, Responder, Ticker, HEIGHT, WIDTH};
+use crate::common::{Action, Drawer, HEIGHT, Key, Responder, Ticker, WIDTH, gameInput, videoFlash};
 use crate::game::Game_Action;
 use crate::levels::{Level_ItemCount, Level_RestoreItems};
 use crate::video::{tile_2_pixel, video_pixel_fill};

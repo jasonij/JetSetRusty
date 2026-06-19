@@ -3,8 +3,8 @@
 #![allow(dead_code)]
 
 use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
-use crate::common::{gameInput, Action, DoNothing, DoQuit, System_Rnd, Title_Action};
-use crate::common::{Drawer, Responder, Ticker, HEIGHT, WIDTH};
+use crate::common::{Action, DoNothing, DoQuit, System_Rnd, Title_Action, gameInput};
+use crate::common::{Drawer, HEIGHT, Responder, Ticker, WIDTH};
 
 use crate::video::{video_draw_robot, video_pixel_fill, video_write, video_write_large};
 use std::sync::Mutex;
@@ -85,7 +85,7 @@ impl CodesState {
     fn get_code(&mut self) {
         let mut location: [u8; 5] = [0x02, 0x07, b' ', b' ', 0x00];
 
-        self.needed = (System_Rnd() % 180);
+        self.needed = System_Rnd() % 180;
 
         location[2] = (self.needed % 18) as u8 + b'A';
         location[3] = (self.needed / 18) as u8 + b'0';

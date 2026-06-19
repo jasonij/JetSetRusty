@@ -82,8 +82,8 @@ pub enum Key {
 
 // Globals defined in game_main.rs, re-exported here for convenience
 pub use crate::game_main::{
-    gameInput, videoFlash, Action, DoNothing, DoQuit, Drawer, Responder, System_Rnd,
-    System_SetPixel, Ticker,
+    Action, DoNothing, DoQuit, Drawer, Responder, System_Rnd, System_SetPixel, Ticker, gameInput,
+    videoFlash,
 };
 
 // Forward declarations of remaining C functions

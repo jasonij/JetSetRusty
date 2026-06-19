@@ -10,6 +10,13 @@ use crate::video::{Video_PixelInkFill, Video_PixelPaperFill, Video_WriteLarge};
 
 use crate::cheat::cheatEnabled;
 use crate::common::{
+    // Types
+    Event,
+    Key,
+    MinerWilly,
+
+    // Constant(s)
+    WIDTH,
     // C globals
     c_game_clock_ticks,
     c_game_frame,
@@ -27,16 +34,9 @@ use crate::common::{
     c_miner_attr_split,
     c_miner_willy,
     c_miner_willy_rope,
-    // Types
-    Event,
-    Key,
-    MinerWilly,
-
-    // Constant(s)
-    WIDTH,
 };
 
-use crate::game_main::{Action, DoNothing, Drawer, Responder, Ticker, TICKRATE};
+use crate::game_main::{Action, DoNothing, Drawer, Responder, TICKRATE, Ticker};
 use crate::levels::level_init;
 use crate::misc::Timer_Set;
 use crate::rope::Rope_Init;

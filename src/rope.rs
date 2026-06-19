@@ -3,7 +3,7 @@
 /// rope.rs - Modernized version with proper FFI safety
 use crate::common::{Event, MinerWilly, WIDTH};
 use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
-use crate::video::{video_draw_rope_seg, video_draw_rope_seg_inner, video_get_pixel, VIDEO_PIXEL};
+use crate::video::{VIDEO_PIXEL, video_draw_rope_seg, video_draw_rope_seg_inner, video_get_pixel};
 use std::sync::atomic::{AtomicI32, Ordering};
 
 const ROPE_SEGS: i32 = 33;
@@ -222,11 +222,7 @@ fn do_rope_drawer() {
             } else if (x & 4) != 0 {
                 0
             } else {
-                if (x & 2) != 0 {
-                    3
-                } else {
-                    2
-                }
+                if (x & 2) != 0 { 3 } else { 2 }
             };
 
             unsafe {

@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::common::{system_set_pixel, HEIGHT, WIDTH};
+use crate::common::{HEIGHT, WIDTH, system_set_pixel};
 
 use std::sync::LazyLock;
 use std::sync::Mutex;

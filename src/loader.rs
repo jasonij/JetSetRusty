@@ -1,6 +1,6 @@
-use crate::audio::{audioMusicPlaying, Audio_Music, MUS_PLAY};
+use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
 use crate::common::{HEIGHT, WIDTH};
-use crate::video::{video_text_width, Video_PixelPaperFill, Video_Write, Video_WriteLarge};
+use crate::video::{Video_PixelPaperFill, Video_Write, Video_WriteLarge, video_text_width};
 
 unsafe extern "C" {
     static mut Action: Option<unsafe extern "C" fn()>;

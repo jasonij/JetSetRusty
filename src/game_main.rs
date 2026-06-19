@@ -1,7 +1,7 @@
 #![allow(non_snake_case, non_upper_case_globals)]
 
-use crate::common::{Event, Key, HEIGHT, WIDTH};
-use crate::misc::{videoColour, Timer, Timer_Set, Timer_Update, Video_Viewport};
+use crate::common::{Event, HEIGHT, Key, WIDTH};
+use crate::misc::{Timer, Timer_Set, Timer_Update, Video_Viewport, videoColour};
 use sdl2::sys as sdl;
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
@@ -91,7 +91,7 @@ thread_local! {
 }
 
 static BORDER_INDEX: AtomicUsize = AtomicUsize::new(0);
-static GAME_RUNNING: AtomicBool  = AtomicBool::new(true);
+static GAME_RUNNING: AtomicBool = AtomicBool::new(true);
 
 // ---- Exported C-facing functions --------------------------------------------
 
@@ -132,7 +132,7 @@ pub extern "C" fn System_SetPixel(pos: i32, index: i32) {
         let offset = (pos / WIDTH) * surface.pitch + (pos & 255) * bpp;
         let pixel = pixels.add(offset as usize);
         let c = &videoColour[index as usize];
-        *pixel        = c.b;
+        *pixel = c.b;
         *pixel.add(1) = c.g;
         *pixel.add(2) = c.r;
     }
@@ -235,8 +235,20 @@ pub fn run() {
     unsafe { sdl::SDL_GetDesktopDisplayMode(0, &raw mut mode) };
 
     let (mut vx, mut vy, mut vw, mut vh) = (0i32, 0i32, 0i32, 0i32);
-    let multiply = Video_Viewport(mode.w, mode.h, &raw mut vx, &raw mut vy, &raw mut vw, &raw mut vh);
-    let viewport = sdl::SDL_Rect { x: vx, y: vy, w: vw, h: vh };
+    let multiply = Video_Viewport(
+        mode.w,
+        mode.h,
+        &raw mut vx,
+        &raw mut vy,
+        &raw mut vw,
+        &raw mut vh,
+    );
+    let viewport = sdl::SDL_Rect {
+        x: vx,
+        y: vy,
+        w: vw,
+        h: vh,
+    };
 
     // Window and renderer -----------------------------------------------------
     let window = unsafe {
@@ -297,7 +309,13 @@ pub fn run() {
         userdata: std::ptr::null_mut(),
     };
     let audio = unsafe {
-        sdl::SDL_OpenAudioDevice(std::ptr::null(), 0, &raw const want, std::ptr::null_mut(), 0)
+        sdl::SDL_OpenAudioDevice(
+            std::ptr::null(),
+            0,
+            &raw const want,
+            std::ptr::null_mut(),
+            0,
+        )
     };
     unsafe { sdl::SDL_PauseAudioDevice(audio, 0) };
 
@@ -310,8 +328,18 @@ pub fn run() {
     unsafe { Audio_Init() };
 
     // Timers ------------------------------------------------------------------
-    let mut timer_frame = Timer { acc: 0, rate: 0, remainder: 0, divisor: 0 };
-    let mut timer_flash = Timer { acc: 0, rate: 0, remainder: 0, divisor: 0 };
+    let mut timer_frame = Timer {
+        acc: 0,
+        rate: 0,
+        remainder: 0,
+        divisor: 0,
+    };
+    let mut timer_flash = Timer {
+        acc: 0,
+        rate: 0,
+        remainder: 0,
+        divisor: 0,
+    };
     Timer_Set(&raw mut timer_frame, TICKRATE, mode.refresh_rate);
     Timer_Set(&raw mut timer_flash, 25, TICKRATE * 8);
 

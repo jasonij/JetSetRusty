@@ -1,4 +1,4 @@
-use crate::common::{videoFlash, MinerWilly, WIDTH};
+use crate::common::{MinerWilly, WIDTH, videoFlash};
 use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
 
 unsafe extern "C" {
