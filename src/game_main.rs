@@ -103,8 +103,8 @@ pub extern "C" fn DoQuit() {
     GAME_RUNNING.store(false, Relaxed);
     // Setting these to None is equivalent to DoNothing — fire() is a no-op on None.
     unsafe {
-        *(&raw mut Drawer) = None;
-        *(&raw mut Ticker) = None;
+        Drawer = None;
+        Ticker = None;
     }
 }
 
@@ -169,7 +169,7 @@ fn fire(event: Event) {
 // Poll one SDL event, update gameInput, return false when the queue is empty.
 fn system_get_event() -> bool {
     unsafe {
-        *(&raw mut gameInput) = Key::None as i32;
+        gameInput = Key::None as i32;
 
         let mut event: sdl::SDL_Event = std::mem::zeroed();
         if sdl::SDL_PollEvent(&raw mut event) == 0 {
@@ -193,7 +193,7 @@ fn system_get_event() -> bool {
         let k1 = sdl::SDL_KeyCode::SDLK_1 as i32;
         let ka = sdl::SDL_KeyCode::SDLK_a as i32;
 
-        *(&raw mut gameInput) = if sym == sdl::SDL_KeyCode::SDLK_RETURN as i32 {
+        gameInput = if sym == sdl::SDL_KeyCode::SDLK_RETURN as i32 {
             Key::Enter as i32
         } else if sym == sdl::SDL_KeyCode::SDLK_ESCAPE as i32 {
             Key::Escape as i32
@@ -325,15 +325,15 @@ pub fn run() {
 
         for _ in 0..frame {
             unsafe {
-                fire(*(&raw const Action));
+                fire(Action);
                 while system_get_event() {
-                    if *(&raw const gameInput) != Key::None as i32 {
-                        fire(*(&raw const Responder));
+                    if gameInput != Key::None as i32 {
+                        fire(Responder);
                     }
                 }
-                fire(*(&raw const Ticker));
-                fire(*(&raw const Drawer));
-                *(&raw mut videoFlash) ^= Timer_Update(&raw mut timer_flash);
+                fire(Ticker);
+                fire(Drawer);
+                videoFlash ^= Timer_Update(&raw mut timer_flash);
             }
         }
 

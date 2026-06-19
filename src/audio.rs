@@ -349,8 +349,8 @@ unsafe extern "C" fn sfx_on_trampoline() {
 // ---- helpers ----------------------------------------------------------------
 
 unsafe fn channel_stereo(ch: &mut Channel, left: i32, right: i32) {
-    let l = SFXVOLUME * left >> 8;
-    let r = SFXVOLUME * right >> 8;
+    let l = (SFXVOLUME * left) >> 8;
+    let r = (SFXVOLUME * right) >> 8;
     ch.left[0] = l;
     ch.right[0] = -r;
     ch.left[1] = -l;
@@ -430,7 +430,7 @@ pub extern "C" fn Audio_Sfx(sfx: i32) {
                 AUDIO_SFX[2].length = 1;
                 AUDIO_SFX[2].pitch_table = SFX_ARROW;
                 AUDIO_SFX[2].pitch_idx = 0;
-                let pan = audioPanX as i32;
+                let pan = audioPanX;
                 channel_stereo(&mut AUDIO_CHANNEL[AUDIO_SFX[2].channel], 256 - pan, pan);
                 AUDIO_SFX[2].do_play = Some(sfx_play_trampoline);
             }

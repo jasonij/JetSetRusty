@@ -164,13 +164,13 @@ pub extern "C" fn Video_Viewport(
     if height * 4 / 3 <= width {
         // landscape
         unsafe {
-            *h = (HEIGHT * height) as i32 / (HEIGHT + 16) as f32 as i32;
+            *h = (HEIGHT * height) / (HEIGHT + 16) as f32 as i32;
             *w = *h * 4 / 3;
         }
     } else {
         // portrait
         unsafe {
-            *w = (WIDTH * width) as i32 / (WIDTH + 16) as f32 as i32;
+            *w = (WIDTH * width) / (WIDTH + 16) as f32 as i32;
             *h = *w * 3 / 4;
         }
     }

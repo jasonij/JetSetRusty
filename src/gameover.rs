@@ -46,12 +46,12 @@ unsafe extern "C" fn gameover_drawer() {
     unsafe {
         if BOOT_TICKS <= 96 {
             Video_DrawSprite(
-                (BOOT_TICKS & 126) * WIDTH as i32 + 15 * 8,
+                (BOOT_TICKS & 126) * WIDTH + 15 * 8,
                 BOOT_SPRITE.as_ptr(),
                 0x0,
                 0x7,
             );
-            Video_PixelPaperFill(0, 128 * WIDTH as i32, ((BOOT_TICKS & 12) >> 2) as u8);
+            Video_PixelPaperFill(0, 128 * WIDTH, ((BOOT_TICKS & 12) >> 2) as u8);
         }
 
         if BOOT_TICKS < 96 {

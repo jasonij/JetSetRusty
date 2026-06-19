@@ -85,7 +85,7 @@ impl CodesState {
     fn get_code(&mut self) {
         let mut location: [u8; 5] = [0x02, 0x07, b' ', b' ', 0x00];
 
-        self.needed = (System_Rnd() % 180) as i32;
+        self.needed = (System_Rnd() % 180);
 
         location[2] = (self.needed % 18) as u8 + b'A';
         location[3] = (self.needed / 18) as u8 + b'0';

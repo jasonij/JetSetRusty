@@ -521,7 +521,7 @@ pub extern "C" fn Video_WriteLarge(x: i32, y: i32, text: *const i8) {
         let ch = (text[i] - b' ') as usize; // Space is the offset for start of alphabet
         let byte = &CHAR_SET_LARGE[ch];
         for col in 0..CHAR_WIDTH {
-            if x >= 0 && x < WIDTH {
+            if (0..WIDTH).contains(&x) {
                 let mut pixel = pos + x;
                 let mut line = byte[col];
                 for _ in 0..CHAR_HEIGHT_LARGE {

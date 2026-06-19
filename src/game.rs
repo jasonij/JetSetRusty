@@ -193,7 +193,7 @@ impl GameState {
 
     // Timer operations
     pub fn get_timer(&self) -> Timer {
-        self.timer.lock().unwrap().clone()
+        *self.timer.lock().unwrap()
     }
 
     pub fn update_timer<F>(&self, f: F)
@@ -201,7 +201,7 @@ impl GameState {
         F: FnOnce(&mut Timer),
     {
         let mut timer = self.timer.lock().unwrap();
-        f(&mut *timer);
+        f(&mut timer);
     }
 }
 
@@ -519,45 +519,47 @@ pub extern "C" fn GameDrawLives() {
 pub fn game_draw_status() {
     sync_c_to_rust();
     let game = &*GAME_STATE;
-    
+
     // Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
     unsafe {
         Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
     }
-    
+
     // Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
     unsafe {
         Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
     }
-    
+
     // Video_WriteLarge(4, STATUS, "\x1\x0\x2\x1" "I" "\x2\x2" "t" "\x2\x3" "e" "\x2\x4" "m" "\x2\x5" "s");
     // Using vec! for the byte string as requested
-    let items_label: Vec<u8> = vec![0x1, 0x0, 0x2, 0x1, b'I', 0x2, 0x2, b't', 0x2, 0x3, b'e', 0x2, 0x4, b'm', 0x2, 0x5, b's', 0];
+    let items_label: Vec<u8> = vec![
+        0x1, 0x0, 0x2, 0x1, b'I', 0x2, 0x2, b't', 0x2, 0x3, b'e', 0x2, 0x4, b'm', 0x2, 0x5, b's', 0,
+    ];
     unsafe {
         Video_WriteLarge(4, STATUS as i32, items_label.as_ptr() as *const i8);
     }
-    
+
     // DrawItems() equivalent
     let score_items = *game.score_items.lock().unwrap();
     let mut items_text: Vec<u8> = vec![0x1, 0x0, 0x2, 0x6, b' ', 0x2, 0x7, b' ', 0];
-    
+
     items_text[7] = (score_items % 10) + b'0';
     if score_items > 9 {
         items_text[4] = (score_items / 10) + b'0';
     }
-    
+
     unsafe {
         Video_WriteLarge(6 * 8 + 4, STATUS as i32, items_text.as_ptr() as *const i8);
     }
-    
+
     // DoDrawClock();
     unsafe {
         DoDrawClock();
     }
-    
+
     // GameDrawLives();
     game_draw_lives();
-    
+
     sync_rust_to_c();
 }
 
@@ -586,8 +588,8 @@ fn sync_rust_to_c() {
         c_level_border = *GAME_STATE.level_border.lock().unwrap();
         c_game_score_clock = *GAME_STATE.score_clock.lock().unwrap();
         c_game_score_items = *GAME_STATE.score_items.lock().unwrap();
-        c_game_timer = GAME_STATE.timer.lock().unwrap().clone();
-        c_miner_willy = GAME_STATE.miner.lock().unwrap().clone();
+        c_game_timer = *GAME_STATE.timer.lock().unwrap();
+        c_miner_willy = *GAME_STATE.miner.lock().unwrap();
     }
 }
 
