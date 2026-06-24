@@ -74,12 +74,10 @@ pub static mut ROPE_TICKER: Option<extern "C" fn() -> ()> = None;
 
 // Probably a lot of functions go here!
 unsafe extern "C" {
-    fn DoDrawClock();
     fn DoDrawOnce();
     fn DoGameDrawer();
     fn DoGameTicker();
     fn DoPauseDrawer();
-    fn DoPauseTicker();
     fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8);
     fn Miner_Drawer();
     fn Miner_Save();
@@ -156,7 +154,7 @@ pub struct GameState {
     pub cheat_enabled: AtomicBool,
     pub clock_ticks: AtomicI32,
     pub frame: AtomicI32,
-    pub game_paused: AtomicBool,
+    pub game_paused: AtomicI32,
     pub inactivity_timer: AtomicI32,
     pub item_count: AtomicI32,
     pub level: AtomicI32,
@@ -256,7 +254,7 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     cheat_enabled: AtomicBool::new(false),
     clock_ticks: AtomicI32::new(0),
     frame: AtomicI32::new(0),
-    game_paused: AtomicBool::new(false),
+    game_paused: AtomicI32::new(0),
     inactivity_timer: AtomicI32::new(0),
     item_count: AtomicI32::new(0),
     level: AtomicI32::new(0),
@@ -323,7 +321,7 @@ pub extern "C" fn game_init_room() {
     // C Globals
     // Ticker, Drawer, Action: still C
     unsafe {
-        if game.game_paused.load(Ordering::Relaxed) {
+        if game.game_paused.load(Ordering::Relaxed) != 0 {
             Ticker = Some(DoNothing);
             Drawer = Some(DoDrawOnce);
         } else {
@@ -338,15 +336,16 @@ pub extern "C" fn game_init_room() {
 pub fn game_pause(state: bool) {
     let game = &*GAME_STATE;
 
-    if (game.game_paused.load(Ordering::Relaxed) == state
-        || game.mode.load(Ordering::Relaxed) >= GameMode::Running as u8)
+    if (game.game_paused.load(Ordering::Relaxed) != 0) == state
+        || game.mode.load(Ordering::Relaxed) >= GameMode::Running as u8
     {
         return;
     }
 
-    game.game_paused.store(state, Ordering::Relaxed);
+    game.game_paused
+        .store(if state { 1 } else { 0 }, Ordering::Relaxed);
 
-    if (game.game_paused.load(Ordering::Relaxed)) {
+    if game.game_paused.load(Ordering::Relaxed) != 0 {
         if (game.cheat_enabled.load(Ordering::Relaxed)) {
             unsafe { Ticker = Some(DoNothing) };
             unsafe { Drawer = Some(DoNothing) };
@@ -385,7 +384,7 @@ pub extern "C" fn do_game_responder() {
     let input = unsafe { gameInput };
 
     match input {
-        x if x == Key::Pause as i32 => game_pause(!game.game_paused.load(Ordering::Relaxed)),
+        x if x == Key::Pause as i32 => game_pause(game.game_paused.load(Ordering::Relaxed) == 0),
         x if x == Key::Mute as i32 => {
             let new_music = if game.music.load(Ordering::Relaxed) == 0 {
                 1
@@ -450,6 +449,51 @@ pub extern "C" fn do_game_drawer() {
 
         sync_c_to_rust();
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn DoDrawClock() {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+
+    let mut text: Vec<u8> = vec![
+        0x1, 0x0, 0x2, 0x7, b' ', 0x2, 0x6, b' ', 0x2, 0x5, b':', 0x2, 0x4, b' ', 0x2, 0x3, b' ',
+        0x2, 0x2, b' ', 0x2, 0x1, b'm', 0,
+    ];
+
+    let score_clock = *game.score_clock.lock().unwrap();
+
+    text[19] = if score_clock[2] != 0 { b'p' } else { b'a' };
+    text[16] = (score_clock[0] % 10) + b'0';
+    text[13] = (score_clock[0] / 10) + b'0';
+    text[7] = (score_clock[1] % 10) + b'0';
+    if score_clock[1] > 9 {
+        text[4] = (score_clock[1] / 10) + b'0';
+    }
+
+    unsafe {
+        Video_WriteLarge(
+            (WIDTH - 60) as i32,
+            STATUS as i32,
+            text.as_ptr() as *const i8,
+        );
+        DO_CLOCK_UPDATE = Some(DoNothing);
+    }
+
+    sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn DoPauseTicker() {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+
+    let old_paused = game.game_paused.fetch_add(1, Ordering::Relaxed);
+    if old_paused == 16 * 5 {
+        game.game_paused.store(1, Ordering::Relaxed);
+    }
+
+    sync_rust_to_c();
 }
 
 // Ported from C's ClockTicker, but NOT yet wired in: the live game loop is still
@@ -604,7 +648,7 @@ fn sync_c_to_rust() {
             .store(c_game_music as u8, Ordering::Relaxed);
         GAME_STATE
             .game_paused
-            .store(c_game_paused != 0, Ordering::Relaxed);
+            .store(c_game_paused, Ordering::Relaxed);
         GAME_STATE
             .clock_ticks
             .store(c_game_clock_ticks, Ordering::Relaxed);

@@ -33,24 +33,6 @@ int             gameMode;
 
 int             itemCount;
 
-void DoDrawClock()
-{
-    char    text[24] = "\x1\x0\x2\x7" " " "\x2\x6" " " "\x2\x5" ":" "\x2\x4" " " "\x2\x3" " " "\x2\x2" " " "\x2\x1" "m";
-
-    text[19] = gameScoreClock[2] ? 'p' : 'a';
-    text[16] = (gameScoreClock[0] % 10) + '0';
-    text[13] = (gameScoreClock[0] / 10) + '0';
-    text[7] = (gameScoreClock[1] % 10) + '0';
-    if (gameScoreClock[1] > 9)
-    {
-        text[4] = (gameScoreClock[1] / 10) + '0';
-    }
-
-    Video_WriteLarge(WIDTH - 60, STATUS, text);
-
-    DoClockUpdate = DoNothing;
-}
-
 void Game_ChangeLevel(int dir)
 {
     int     level = Level_Dir(dir);
@@ -159,14 +141,6 @@ void DoPauseDrawer()
     {
         Level_SetBorder();
         Video_CycleColours();
-    }
-}
-
-void DoPauseTicker()
-{
-    if (gamePaused++ == 16 * 5)
-    {
-        gamePaused = 1;
     }
 }
 

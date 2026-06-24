@@ -60,6 +60,8 @@ void Game_DrawStatus(void);
 void Game_Pause(int);
 void Game_CheatEnabled(void);
 void GameDrawLives(void);
+void DoDrawClock(void);
+void DoPauseTicker(void);
 
 // cheat
 extern int      cheatEnabled;
