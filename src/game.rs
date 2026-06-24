@@ -74,7 +74,6 @@ pub static mut ROPE_TICKER: Option<extern "C" fn() -> ()> = None;
 
 // Probably a lot of functions go here!
 unsafe extern "C" {
-    fn DoDrawOnce();
     fn DoGameDrawer();
     fn DoGameTicker();
     fn DoPauseDrawer();
@@ -491,6 +490,19 @@ pub extern "C" fn DoPauseTicker() {
     let old_paused = game.game_paused.fetch_add(1, Ordering::Relaxed);
     if old_paused == 16 * 5 {
         game.game_paused.store(1, Ordering::Relaxed);
+    }
+
+    sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn DoDrawOnce() {
+    sync_c_to_rust();
+
+    do_game_drawer();
+
+    unsafe {
+        Drawer = Some(DoNothing);
     }
 
     sync_rust_to_c();

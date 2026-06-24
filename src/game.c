@@ -170,13 +170,6 @@ void DoGameDrawer()
     DoClockUpdate();
 }
 
-void DoDrawOnce()
-{
-    DoGameDrawer();
-
-    Drawer = DoNothing;
-}
-
 void DoGameTicker()
 {
     if (gameMusic == MUS_STOP && gameInactivityTimer++ == 256 * 5 && gameMode < GM_RUNNING)
