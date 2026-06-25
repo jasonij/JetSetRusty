@@ -10,13 +10,6 @@ use crate::video::{Video_PixelInkFill, Video_PixelPaperFill, Video_WriteLarge};
 
 use crate::cheat::cheatEnabled;
 use crate::common::{
-    // Types
-    Event,
-    Key,
-    MinerWilly,
-
-    // Constant(s)
-    WIDTH,
     // C globals
     c_game_clock_ticks,
     c_game_frame,
@@ -34,9 +27,16 @@ use crate::common::{
     c_miner_attr_split,
     c_miner_willy,
     c_miner_willy_rope,
+    // Types
+    Event,
+    Key,
+    MinerWilly,
+
+    // Constant(s)
+    WIDTH,
 };
 
-use crate::game_main::{Action, DoNothing, Drawer, Responder, TICKRATE, Ticker};
+use crate::game_main::{Action, DoNothing, Drawer, Responder, Ticker, TICKRATE};
 use crate::levels::level_init;
 use crate::misc::Timer_Set;
 use crate::rope::Rope_Init;
@@ -450,9 +450,9 @@ pub extern "C" fn do_game_drawer() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DoDrawClock() {
-    sync_c_to_rust();
+pub fn do_draw_clock() {
+    println!("do_draw_clock: START");
+    // NOTE: Caller must have synced state
     let game = &*GAME_STATE;
 
     let mut text: Vec<u8> = vec![
@@ -478,7 +478,13 @@ pub extern "C" fn DoDrawClock() {
         );
         DO_CLOCK_UPDATE = Some(DoNothing);
     }
+    println!("do_draw_clock: DONE");
+}
 
+#[unsafe(no_mangle)]
+pub extern "C" fn DoDrawClock() {
+    sync_c_to_rust();
+    do_draw_clock();
     sync_rust_to_c();
 }
 
@@ -506,6 +512,45 @@ pub extern "C" fn DoDrawOnce() {
     }
 
     sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn Game_GotItem() {
+    println!("Game_GotItem: START");
+    sync_c_to_rust();
+    println!("Game_GotItem: after sync_c_to_rust");
+    let game = &*GAME_STATE;
+
+    // gameScoreItems++
+    *game.score_items.lock().unwrap() += 1;
+    println!("Game_GotItem: after incrementing score_items");
+
+    // Game_DrawStatus()
+    println!("Game_GotItem: about to call game_draw_status");
+    game_draw_status();
+    println!("Game_GotItem: back from game_draw_status");
+
+    // if (--itemCount == 0) { gameMode = GM_MARIA; }
+    if game.item_count.fetch_sub(1, Ordering::Relaxed) == 1 {
+        game.mode.store(GameMode::Maria as u8, Ordering::Relaxed);
+    }
+
+    // audioPanX = minerWilly.x
+    // Read x and drop the guard immediately — holding it past here would
+    // self-deadlock when sync_rust_to_c() re-locks GAME_STATE.miner below.
+    let miner_x = game.miner.lock().unwrap().x;
+    unsafe {
+        crate::audio::audioPanX = miner_x;
+    }
+
+    // Audio_Sfx(SFX_ITEM)
+    unsafe {
+        crate::audio::Audio_Sfx(0);
+    }
+
+    println!("Game_GotItem: about to call sync_rust_to_c");
+    sync_rust_to_c();
+    println!("Game_GotItem: DONE");
 }
 
 // Ported from C's ClockTicker, but NOT yet wired in: the live game loop is still
@@ -554,7 +599,8 @@ pub extern "C" fn clock_ticker() {
 }
 
 pub fn game_draw_lives() {
-    sync_c_to_rust();
+    println!("game_draw_lives: START");
+    // NOTE: Caller must have synced state
     let game = &*GAME_STATE;
     let lives = game.lives.load(Ordering::Relaxed) as usize;
 
@@ -564,16 +610,19 @@ pub fn game_draw_lives() {
             Miner_DrawSeqSprite(pos as i32, 0x0, LIFE_INK[l]);
         }
     }
-    sync_rust_to_c();
+    println!("game_draw_lives: DONE");
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn GameDrawLives() {
+    sync_c_to_rust();
     game_draw_lives();
+    sync_rust_to_c();
 }
 
 pub fn game_draw_status() {
-    sync_c_to_rust();
+    println!("game_draw_status: START");
+    // NOTE: Caller must have synced state (Game_DrawStatus or Game_GotItem)
     let game = &*GAME_STATE;
 
     // Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
@@ -596,7 +645,9 @@ pub fn game_draw_status() {
     }
 
     // DrawItems() equivalent
+    println!("game_draw_status: about to lock score_items");
     let score_items = *game.score_items.lock().unwrap();
+    println!("game_draw_status: locked score_items");
     let mut items_text: Vec<u8> = vec![0x1, 0x0, 0x2, 0x6, b' ', 0x2, 0x7, b' ', 0];
 
     items_text[7] = (score_items % 10) + b'0';
@@ -609,22 +660,26 @@ pub fn game_draw_status() {
     }
 
     // DoDrawClock();
-    unsafe {
-        DoDrawClock();
-    }
+    println!("game_draw_status: about to call do_draw_clock");
+    do_draw_clock();
+    println!("game_draw_status: back from do_draw_clock");
 
     // GameDrawLives();
+    println!("game_draw_status: about to call game_draw_lives");
     game_draw_lives();
-
-    sync_rust_to_c();
+    println!("game_draw_status: back from game_draw_lives");
+    println!("game_draw_status: DONE");
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Game_DrawStatus() {
+    sync_c_to_rust();
     game_draw_status();
+    sync_rust_to_c();
 }
 
 fn sync_rust_to_c() {
+    println!("sync_rust_to_c: START");
     unsafe {
         // Atomic fields -> C globals
         c_game_level = GAME_STATE.level.load(Ordering::Relaxed);
@@ -642,14 +697,21 @@ fn sync_rust_to_c() {
 
         // Mutex fields -> C globals
         c_level_border = *GAME_STATE.level_border.lock().unwrap();
+        println!("sync_rust_to_c: locked level_border");
         c_game_score_clock = *GAME_STATE.score_clock.lock().unwrap();
+        println!("sync_rust_to_c: locked score_clock");
         c_game_score_items = *GAME_STATE.score_items.lock().unwrap();
+        println!("sync_rust_to_c: locked score_items");
         c_game_timer = *GAME_STATE.timer.lock().unwrap();
+        println!("sync_rust_to_c: locked timer, about to lock miner");
         c_miner_willy = *GAME_STATE.miner.lock().unwrap();
+        println!("sync_rust_to_c: locked miner");
     }
+    println!("sync_rust_to_c: DONE");
 }
 
 fn sync_c_to_rust() {
+    println!("sync_c_to_rust: START");
     unsafe {
         // C globals -> Atomic fields
         GAME_STATE.level.store(c_game_level, Ordering::Relaxed);
@@ -681,11 +743,17 @@ fn sync_c_to_rust() {
 
         // C globals -> Mutex fields
         *GAME_STATE.level_border.lock().unwrap() = c_level_border;
+        println!("sync_c_to_rust: locked level_border");
         *GAME_STATE.score_clock.lock().unwrap() = c_game_score_clock;
+        println!("sync_c_to_rust: locked score_clock");
         *GAME_STATE.score_items.lock().unwrap() = c_game_score_items;
+        println!("sync_c_to_rust: locked score_items");
         *GAME_STATE.timer.lock().unwrap() = c_game_timer;
+        println!("sync_c_to_rust: locked timer");
         *GAME_STATE.miner.lock().unwrap() = c_miner_willy;
+        println!("sync_c_to_rust: locked miner");
     }
+    println!("sync_c_to_rust: DONE");
 }
 
 #[allow(non_snake_case)]

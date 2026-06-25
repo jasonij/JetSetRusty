@@ -121,20 +121,6 @@ void ClockTicker()
 }
 
 
-void Game_GotItem()
-{
-    gameScoreItems++;
-    Game_DrawStatus();
-
-    if (--itemCount == 0)
-    {
-        gameMode = GM_MARIA;
-    }
-
-    audioPanX = minerWilly.x;
-    Audio_Sfx(SFX_ITEM);
-}
-
 void DoPauseDrawer()
 {
     if (gamePaused == 16 * 5)
