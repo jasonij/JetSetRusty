@@ -1,5 +1,5 @@
 #![allow(unused)]
-use crate::audio::{Audio_Play, MUS_PLAY, MUS_STOP};
+use crate::audio::{Audio_Music, Audio_Play, MUS_PLAY, MUS_STOP};
 use crate::cheat::Cheat_Responder;
 use crate::game_main::gameInput;
 use crate::gameover::Gameover_Action;
@@ -49,6 +49,9 @@ use crate::title::Title_Action;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
 use std::sync::{LazyLock, Mutex};
 
+// Music constants (from audio.h enum: MUS_TITLE=0, MUS_GAME=1, MUS_LOADER=2)
+const MUS_GAME: i32 = 1;
+
 // Public constants (from game.h)
 pub const LIVES: usize = (18 * 8 + 4) * WIDTH as usize + 4;
 pub const STATUS: usize = 21 * 8 + 4;
@@ -68,7 +71,7 @@ pub const THEBATHROOM: i32 = 33;
 pub const MASTERBEDROOM: i32 = 35;
 pub const THEBEACH: i32 = 57;
 
-// Life ink colors for drawing lives
+// life ink colors for drawing lives
 const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
 
 // Static callback variable(s)
@@ -83,6 +86,7 @@ unsafe extern "C" {
     fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8);
     fn Miner_Drawer();
     fn Miner_Save();
+    fn Miner_SetSeq(index: i32, speed: i32);
     fn Robots_Drawer();
     fn Robots_Init();
     fn System_Border(x: i32);
@@ -512,6 +516,48 @@ pub extern "C" fn DoPauseDrawer() {
             Level_SetBorder();
             Video_CycleColours();
         }
+    }
+
+    sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn Game_GameReset() {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+
+    // gameScoreItems = 0
+    *game.score_items.lock().unwrap() = 0;
+
+    // gameScoreClock[0] = 0; gameScoreClock[1] = 7; gameScoreClock[2] = 0
+    let mut clock = game.score_clock.lock().unwrap();
+    clock[0] = 0;
+    clock[1] = 7;
+    clock[2] = 0;
+
+    // DoClockUpdate = DoDrawClock
+    unsafe {
+        DO_CLOCK_UPDATE = Some(DoDrawClock);
+    }
+
+    // gameClockTicks = 0
+    game.clock_ticks.store(0, Ordering::Relaxed);
+
+    // gamePaused = 0
+    game.game_paused.store(0, Ordering::Relaxed);
+
+    // Miner_SetSeq(0, 20)
+    unsafe {
+        Miner_SetSeq(0, 20);
+    }
+
+    // gameLives = 7
+    game.lives.store(7, Ordering::Relaxed);
+
+    // Audio_Music(MUS_GAME, gameMusic)
+    let music = game.music.load(Ordering::Relaxed);
+    unsafe {
+        Audio_Music(MUS_GAME, music as i32);
     }
 
     sync_rust_to_c();

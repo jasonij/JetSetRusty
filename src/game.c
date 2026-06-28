@@ -6,6 +6,7 @@
 
 // Ported to Rust
 extern void DoPauseDrawer();
+extern void Game_GameReset();
 
 int             gameMusic = MUS_PLAY;
 
@@ -328,24 +329,7 @@ void Game_InitRoom()
     Action = DoNothing;
 }
 
-void Game_GameReset()
-{
-    gameScoreItems = 0;
-
-    gameScoreClock[0] = 0;
-    gameScoreClock[1] = 7;
-    gameScoreClock[2] = 0; // am
-    DoClockUpdate = DoDrawClock;
-
-    gameClockTicks = 0;
-
-    gamePaused = 0;
-
-    Miner_SetSeq(0, 20);
-    gameLives = 7;
-
-    Audio_Music(MUS_GAME, gameMusic);
-}
+// Game_GameReset - ported to game.rs
 
 void Game_Action_ORIG()
 {
