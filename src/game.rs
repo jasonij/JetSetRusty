@@ -87,6 +87,7 @@ unsafe extern "C" {
     fn Miner_Drawer();
     fn Miner_Save();
     fn Miner_SetSeq(index: i32, speed: i32);
+    fn Robots_DrawCheat();
     fn Robots_Drawer();
     fn Robots_Init();
     fn System_Border(x: i32);
@@ -558,6 +559,40 @@ pub extern "C" fn Game_GameReset() {
     let music = game.music.load(Ordering::Relaxed);
     unsafe {
         Audio_Music(MUS_GAME, music as i32);
+    }
+
+    sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn Game_CheatEnabled() {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+
+    if game.game_paused.load(Ordering::Relaxed) != 0 {
+        // gameFrame = 1
+        game.frame.store(1, Ordering::Relaxed);
+
+        // Ticker = DoNothing; Drawer = DoNothing;
+        unsafe {
+            Ticker = Some(DoNothing);
+            Drawer = Some(DoNothing);
+        }
+
+        // Game_DrawStatus(); System_Border(levelBorder[gameLevel])
+        game_draw_status();
+        let level = game.level.load(Ordering::Relaxed);
+        unsafe {
+            System_Border(game.level_border.lock().unwrap()[level as usize]);
+        }
+    }
+
+    // cheatEnabled = 1
+    game.cheat_enabled.store(true, Ordering::Relaxed);
+
+    // Robots_DrawCheat()
+    unsafe {
+        Robots_DrawCheat();
     }
 
     sync_rust_to_c();

@@ -7,6 +7,7 @@
 // Ported to Rust
 extern void DoPauseDrawer();
 extern void Game_GameReset();
+extern void Game_CheatEnabled();
 
 int             gameMusic = MUS_PLAY;
 
@@ -253,23 +254,7 @@ void Game_Pause(int state)
     }
 }
 
-void Game_CheatEnabled()
-{
-    if (gamePaused)
-    {
-        gameFrame = 1;
-
-        Ticker = DoNothing;
-        Drawer = DoDrawOnce;
-
-        Game_DrawStatus();
-        System_Border(levelBorder[gameLevel]);
-    }
-
-    cheatEnabled = 1;
-
-    Robots_DrawCheat();
-}
+// Game_CheatEnabled - ported to game.rs
 
 static void DoGameResponder()
 {
