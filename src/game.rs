@@ -374,10 +374,13 @@ pub fn game_pause(state: bool) {
         game.inactivity_timer.store(0, Ordering::Relaxed);
         if (game.cheat_enabled.load(Ordering::Relaxed)) {
             game_draw_status();
-            unsafe {
-                System_Border(
-                    game.level_border.lock().unwrap()[game.level.load(Ordering::Relaxed) as usize],
-                );
+            // Use scope to drop level_border guard before function returns
+            {
+                let border = game.level_border.lock().unwrap();
+                unsafe {
+                    System_Border(border[game.level.load(Ordering::Relaxed) as usize]);
+                }
+                // border guard dropped here
             }
         }
     }
@@ -629,43 +632,47 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
     game.level.store(level, Ordering::Relaxed);
 
     // Update minerWilly based on direction
-    let mut miner = game.miner.lock().unwrap();
-    match dir {
-        x if x == Direction::Above as i32 => {
-            // minerWilly.y = 13 * 8 = 104
-            miner.y = 13 * 8;
-            // minerWilly.x = (minerWilly.tile & 31) * 8
-            miner.x = (miner.tile & 31) * 8;
-            // minerWilly.tile = 13 * 32 + (minerWilly.tile & 31)
-            miner.tile = 13 * 32 + (miner.tile & 31);
-            // minerWilly.align = 4
-            miner.align = 4;
-            // minerWilly.air = 0
-            miner.air = 0;
-        }
-        x if x == Direction::Right as i32 => {
-            // minerWilly.x = 0
-            miner.x = 0;
-            // minerWilly.tile &= ~31
-            miner.tile &= !31;
-        }
-        x if x == Direction::Below as i32 => {
-            // if (minerWilly.air < 11) { minerWilly.air = 2; }
-            if miner.air < 11 {
-                miner.air = 2;
+    // Use a scope to drop the lock before calling game_init_room()
+    {
+        let mut miner = game.miner.lock().unwrap();
+        match dir {
+            x if x == Direction::Above as i32 => {
+                // minerWilly.y = 13 * 8 = 104
+                miner.y = 13 * 8;
+                // minerWilly.x = (minerWilly.tile & 31) * 8
+                miner.x = (miner.tile & 31) * 8;
+                // minerWilly.tile = 13 * 32 + (minerWilly.tile & 31)
+                miner.tile = 13 * 32 + (miner.tile & 31);
+                // minerWilly.align = 4
+                miner.align = 4;
+                // minerWilly.air = 0
+                miner.air = 0;
             }
-            // minerWilly.y = 0
-            miner.y = 0;
-            // minerWilly.tile &= 31
-            miner.tile &= 31;
+            x if x == Direction::Right as i32 => {
+                // minerWilly.x = 0
+                miner.x = 0;
+                // minerWilly.tile &= ~31
+                miner.tile &= !31;
+            }
+            x if x == Direction::Below as i32 => {
+                // if (minerWilly.air < 11) { minerWilly.air = 2; }
+                if miner.air < 11 {
+                    miner.air = 2;
+                }
+                // minerWilly.y = 0
+                miner.y = 0;
+                // minerWilly.tile &= 31
+                miner.tile &= 31;
+            }
+            x if x == Direction::Left as i32 => {
+                // minerWilly.x = 30 * 8 = 240
+                miner.x = 30 * 8;
+                // minerWilly.tile |= 30
+                miner.tile |= 30;
+            }
+            _ => {}
         }
-        x if x == Direction::Left as i32 => {
-            // minerWilly.x = 30 * 8 = 240
-            miner.x = 30 * 8;
-            // minerWilly.tile |= 30
-            miner.tile |= 30;
-        }
-        _ => {}
+        // miner guard dropped here at end of scope
     }
 
     // Game_InitRoom()
@@ -742,16 +749,20 @@ pub extern "C" fn DoGameTicker() {
 
     // GM_RUNNING mode
     if game.mode.load(Ordering::Relaxed) == GameMode::Running as u8 {
-        let mut miner = game.miner.lock().unwrap();
-        miner.frame |= 1;
+        // Use scope to ensure miner guard is dropped before sync_rust_to_c()
+        {
+            let mut miner = game.miner.lock().unwrap();
+            miner.frame |= 1;
 
-        if miner.x == 224 && game.level.load(Ordering::Relaxed) == THEBATHROOM {
-            drop(miner);
-            game.mode.store(GameMode::Toilet as u8, Ordering::Relaxed);
-            unsafe {
-                Robots_Flush();
+            if miner.x == 224 && game.level.load(Ordering::Relaxed) == THEBATHROOM {
+                drop(miner);
+                game.mode.store(GameMode::Toilet as u8, Ordering::Relaxed);
+                unsafe {
+                    Robots_Flush();
+                }
+                game.clock_ticks.store(0, Ordering::Relaxed);
             }
-            game.clock_ticks.store(0, Ordering::Relaxed);
+            // miner guard dropped here at end of scope
         }
 
         sync_rust_to_c();
@@ -762,10 +773,14 @@ pub extern "C" fn DoGameTicker() {
     if game.mode.load(Ordering::Relaxed) == GameMode::Maria as u8
         && game.level.load(Ordering::Relaxed) == MASTERBEDROOM
     {
-        let miner = game.miner.lock().unwrap();
-        if miner.air == 0 && miner.x == 40 {
-            drop(miner);
-            game.mode.store(GameMode::Running as u8, Ordering::Relaxed);
+        // Use scope to ensure miner guard is dropped before sync_rust_to_c()
+        {
+            let miner = game.miner.lock().unwrap();
+            if miner.air == 0 && miner.x == 40 {
+                drop(miner);
+                game.mode.store(GameMode::Running as u8, Ordering::Relaxed);
+            }
+            // miner guard dropped here at end of scope
         }
     }
 
@@ -834,21 +849,25 @@ pub extern "C" fn clock_ticker() {
 
     game.clock_ticks.store(0, Ordering::Relaxed);
 
-    let mut clock = game.score_clock.lock().unwrap();
-    clock[0] += 1;
-    if (clock[0] == 60) {
-        clock[0] = 0;
-        clock[1] += 1;
-        if (clock[1] == 12) {
-            clock[2] = 1 - clock[2];
-            if (clock[2] == 0) && (game.mode.load(Ordering::Relaxed) < GameMode::Maria as u8) {
-                unsafe {
-                    Action = Some(Gameover_Action);
+    // Use scope to drop clock guard before sync_rust_to_c()
+    {
+        let mut clock = game.score_clock.lock().unwrap();
+        clock[0] += 1;
+        if (clock[0] == 60) {
+            clock[0] = 0;
+            clock[1] += 1;
+            if (clock[1] == 12) {
+                clock[2] = 1 - clock[2];
+                if (clock[2] == 0) && (game.mode.load(Ordering::Relaxed) < GameMode::Maria as u8) {
+                    unsafe {
+                        Action = Some(Gameover_Action);
+                    }
                 }
+            } else if (clock[1] == 13) {
+                clock[1] = 1;
             }
-        } else if (clock[1] == 13) {
-            clock[1] = 1;
         }
+        // clock guard dropped here
     }
 
     unsafe {
