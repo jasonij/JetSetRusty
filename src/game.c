@@ -6,6 +6,7 @@
 
 // Ported to Rust
 extern void DoPauseDrawer();
+extern void DoGameTicker();
 extern void Game_GameReset();
 extern void Game_CheatEnabled();
 extern void Game_ChangeLevel(int dir);
@@ -40,41 +41,7 @@ int             gameMode;
 int             itemCount;
 
 // Game_ChangeLevel - ported to game.rs
-
-void ClockTicker()
-{
-    // 256 frames = 1 game minute
-    // 19 game hours = 6.75... actual hours (19 * 60 * 256 / 12 / 60 / 60)
-    // there's a guy on YouTube that can do it in less than 20m
-    //  (2m15s using cheat mode)
-    if (gameClockTicks++ < 256)
-    {
-        return;
-    }
-
-    gameClockTicks = 0;
-
-    gameScoreClock[0]++;
-    if (gameScoreClock[0] == 60)
-    {
-        gameScoreClock[0] = 0;
-        gameScoreClock[1]++;
-        if (gameScoreClock[1] == 12)
-        {
-            gameScoreClock[2] = 1 - gameScoreClock[2];
-            if (gameScoreClock[2] == 0 && gameMode < GM_MARIA)
-            {
-                Action = Gameover_Action;
-            }
-        }
-        else if (gameScoreClock[1] == 13)
-        {
-            gameScoreClock[1] = 1;
-        }
-    }
-
-    DoClockUpdate = DoDrawClock;
-}
+// ClockTicker - ported to game.rs as clock_ticker
 
 
 // DoPauseDrawer - ported to game.rs
@@ -105,67 +72,7 @@ void DoGameDrawer()
     DoClockUpdate();
 }
 
-void DoGameTicker()
-{
-    if (gameMusic == MUS_STOP && gameInactivityTimer++ == 256 * 5 && gameMode < GM_RUNNING)
-    {
-        Game_Pause(1);
-
-        return;
-    }
-
-    if (gameMusic == MUS_PLAY)
-    {
-        Miner_IncSeq();
-    }
-
-    gameFrame = Timer_Update(&gameTimer);
-    if (gameFrame == 0)
-    {
-        return;
-    }
-
-    Level_Ticker();
-    Robots_Ticker();
-
-    if (gameMode == GM_TOILET)
-    {
-        if (gameClockTicks++ == 256)
-        {
-            Action = Title_Action;
-        }
-
-        return;
-    }
-
-    Miner_Ticker();
-
-    if (gameMode == GM_RUNNING)
-    {
-        minerWilly.frame |= 1;
-
-        if (minerWilly.x == 224 && gameLevel == THEBATHROOM)
-        {
-            gameMode = GM_TOILET;
-            Robots_Flush();
-            gameClockTicks = 0;
-        }
-
-        return;
-    }
-
-    if (gameMode == GM_MARIA && gameLevel == MASTERBEDROOM)
-    {
-        if (minerWilly.air == 0 && minerWilly.x == 40)
-        {
-            gameMode = GM_RUNNING;
-        }
-    }
-
-    Rope_Ticker();
-
-    ClockTicker();
-}
+// DoGameTicker - ported to game.rs
 
 void Game_Pause(int state)
 {

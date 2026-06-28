@@ -82,15 +82,21 @@ pub static mut ROPE_TICKER: Option<extern "C" fn() -> ()> = None;
 // Probably a lot of functions go here!
 unsafe extern "C" {
     fn DoGameDrawer();
-    fn DoGameTicker();
+    fn Level_Ticker();
     fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8);
     fn Miner_Drawer();
+    fn Miner_IncSeq();
     fn Miner_Save();
     fn Miner_SetSeq(index: i32, speed: i32);
+    fn Miner_Ticker();
     fn Robots_DrawCheat();
-    fn Robots_Drawer();
+    fn Robots_Flush();
     fn Robots_Init();
+    fn Robots_Ticker();
+    fn Rope_Ticker();
+    fn Robots_Drawer();
     fn System_Border(x: i32);
+    fn Timer_Update(timer: *mut Timer) -> i32;
 }
 
 // Enums (from game.h)
@@ -683,6 +689,99 @@ pub extern "C" fn DoDrawOnce() {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn DoGameTicker() {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+
+    // Inactivity check: pause after 5 minutes when music stopped
+    if game.music.load(Ordering::Relaxed) == MUS_STOP as u8 {
+        let old = game.inactivity_timer.fetch_add(1, Ordering::Relaxed);
+        if old == 256 * 5 && game.mode.load(Ordering::Relaxed) < GameMode::Running as u8 {
+            game_pause(true);
+            sync_rust_to_c();
+            return;
+        }
+    }
+
+    // Miner animation
+    if game.music.load(Ordering::Relaxed) == MUS_PLAY as u8 {
+        unsafe {
+            Miner_IncSeq();
+        }
+    }
+
+    // Update game frame
+    let frame = unsafe { Timer_Update(&mut *game.timer.lock().unwrap()) };
+    game.frame.store(frame, Ordering::Relaxed);
+    if frame == 0 {
+        sync_rust_to_c();
+        return;
+    }
+
+    // Tick level and robots
+    unsafe {
+        Level_Ticker();
+        Robots_Ticker();
+    }
+
+    // GM_TOILET mode: return to title after timeout
+    if game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8 {
+        let old_ticks = game.clock_ticks.fetch_add(1, Ordering::Relaxed);
+        if old_ticks == 256 {
+            unsafe {
+                Action = Some(Title_Action);
+            }
+        }
+        sync_rust_to_c();
+        return;
+    }
+
+    // Tick miner
+    unsafe {
+        Miner_Ticker();
+    }
+
+    // GM_RUNNING mode
+    if game.mode.load(Ordering::Relaxed) == GameMode::Running as u8 {
+        let mut miner = game.miner.lock().unwrap();
+        miner.frame |= 1;
+
+        if miner.x == 224 && game.level.load(Ordering::Relaxed) == THEBATHROOM {
+            drop(miner);
+            game.mode.store(GameMode::Toilet as u8, Ordering::Relaxed);
+            unsafe {
+                Robots_Flush();
+            }
+            game.clock_ticks.store(0, Ordering::Relaxed);
+        }
+
+        sync_rust_to_c();
+        return;
+    }
+
+    // GM_MARIA mode: check for victory
+    if game.mode.load(Ordering::Relaxed) == GameMode::Maria as u8
+        && game.level.load(Ordering::Relaxed) == MASTERBEDROOM
+    {
+        let miner = game.miner.lock().unwrap();
+        if miner.air == 0 && miner.x == 40 {
+            drop(miner);
+            game.mode.store(GameMode::Running as u8, Ordering::Relaxed);
+        }
+    }
+
+    // Tick rope
+    unsafe {
+        Rope_Ticker();
+    }
+
+    // Tick clock - use Rust version now
+    clock_ticker();
+
+    sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn Game_GotItem() {
     sync_c_to_rust();
     let game = &*GAME_STATE;
@@ -714,10 +813,8 @@ pub extern "C" fn Game_GotItem() {
     sync_rust_to_c();
 }
 
-// Ported from C's ClockTicker, but NOT yet wired in: the live game loop is still
-// C's DoGameTicker, which calls C's ClockTicker (game.c). Hook this up when
-// DoGameTicker itself is ported — and note it reads/writes GAME_STATE, so it'll
-// need the sync bookends (or to run inside an already-synced Rust ticker).
+// Ported from C's ClockTicker. Now called from Rust's DoGameTicker.
+// Reads/writes GAME_STATE, so it uses sync bookends.
 #[unsafe(no_mangle)]
 pub extern "C" fn clock_ticker() {
     sync_c_to_rust();
