@@ -8,6 +8,7 @@
 extern void DoPauseDrawer();
 extern void Game_GameReset();
 extern void Game_CheatEnabled();
+extern void Game_ChangeLevel(int dir);
 
 int             gameMusic = MUS_PLAY;
 
@@ -38,57 +39,7 @@ int             gameMode;
 
 int             itemCount;
 
-void Game_ChangeLevel(int dir)
-{
-    int     level = Level_Dir(dir);
-
-    if (dir == R_ABOVE)
-    {
-        // this fixes jumping up from the ramp in "Under the Drive"
-        //  and appearing inside the floor in "The Drive"
-        // also applies to "First Landing"
-        if ((level == THEDRIVE && minerWilly.x > 22 && minerWilly.x < 32) || (level == FIRSTLANDING && minerWilly.x > 182))
-        {
-            minerWilly.air = 2;
-            return; // we're not changing rooms
-        }
-    }
-
-    gameLevel = level;
-
-    switch (dir)
-    {
-      case R_ABOVE:
-        minerWilly.y = 13 * 8;
-        minerWilly.x = (minerWilly.tile & 31) * 8;
-        minerWilly.tile = 13 * 32 + (minerWilly.tile & 31);
-        minerWilly.align = 4;
-        minerWilly.air = 0;
-        break;
-
-      case R_RIGHT:
-        minerWilly.x = 0;
-        minerWilly.tile &= ~31;
-        break;
-
-      case R_BELOW:
-        if (minerWilly.air < 11)
-        {
-            minerWilly.air = 2;
-        }
-
-        minerWilly.y = 0;
-        minerWilly.tile &= 31;
-        break;
-
-      case R_LEFT:
-        minerWilly.x = 30 * 8;
-        minerWilly.tile |= 30;
-        break;
-    }
-
-    Game_InitRoom();
-}
+// Game_ChangeLevel - ported to game.rs
 
 void ClockTicker()
 {

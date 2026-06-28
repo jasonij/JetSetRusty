@@ -3,7 +3,7 @@ use crate::audio::{Audio_Music, Audio_Play, MUS_PLAY, MUS_STOP};
 use crate::cheat::Cheat_Responder;
 use crate::game_main::gameInput;
 use crate::gameover::Gameover_Action;
-use crate::levels::{self, Level_Drawer};
+use crate::levels::{self, Level_Dir, Level_Drawer};
 use crate::misc::Timer;
 use crate::rope;
 use crate::video::{
@@ -594,6 +594,77 @@ pub extern "C" fn Game_CheatEnabled() {
     unsafe {
         Robots_DrawCheat();
     }
+
+    sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn Game_ChangeLevel(dir: i32) {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+
+    // int level = Level_Dir(dir)
+    let level = unsafe { Level_Dir(dir as usize) };
+
+    // Special case for R_ABOVE from THEDRIVE or FIRSTLANDING
+    if dir == Direction::Above as i32 {
+        let miner = game.miner.lock().unwrap();
+        if (level == THEDRIVE && miner.x > 22 && miner.x < 32)
+            || (level == FIRSTLANDING && miner.x > 182)
+        {
+            // minerWilly.air = 2; return
+            drop(miner); // release the lock before we mutate
+            game.miner.lock().unwrap().air = 2;
+            sync_rust_to_c();
+            return;
+        }
+    }
+
+    // gameLevel = level
+    game.level.store(level, Ordering::Relaxed);
+
+    // Update minerWilly based on direction
+    let mut miner = game.miner.lock().unwrap();
+    match dir {
+        x if x == Direction::Above as i32 => {
+            // minerWilly.y = 13 * 8 = 104
+            miner.y = 13 * 8;
+            // minerWilly.x = (minerWilly.tile & 31) * 8
+            miner.x = (miner.tile & 31) * 8;
+            // minerWilly.tile = 13 * 32 + (minerWilly.tile & 31)
+            miner.tile = 13 * 32 + (miner.tile & 31);
+            // minerWilly.align = 4
+            miner.align = 4;
+            // minerWilly.air = 0
+            miner.air = 0;
+        }
+        x if x == Direction::Right as i32 => {
+            // minerWilly.x = 0
+            miner.x = 0;
+            // minerWilly.tile &= ~31
+            miner.tile &= !31;
+        }
+        x if x == Direction::Below as i32 => {
+            // if (minerWilly.air < 11) { minerWilly.air = 2; }
+            if miner.air < 11 {
+                miner.air = 2;
+            }
+            // minerWilly.y = 0
+            miner.y = 0;
+            // minerWilly.tile &= 31
+            miner.tile &= 31;
+        }
+        x if x == Direction::Left as i32 => {
+            // minerWilly.x = 30 * 8 = 240
+            miner.x = 30 * 8;
+            // minerWilly.tile |= 30
+            miner.tile |= 30;
+        }
+        _ => {}
+    }
+
+    // Game_InitRoom()
+    game_init_room();
 
     sync_rust_to_c();
 }
