@@ -81,7 +81,6 @@ pub static mut ROPE_TICKER: Option<extern "C" fn() -> ()> = None;
 
 // Probably a lot of functions go here!
 unsafe extern "C" {
-    fn DoGameDrawer();
     fn Level_Ticker();
     fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8);
     fn Miner_Drawer();
@@ -369,7 +368,7 @@ pub fn game_pause(state: bool) {
         Audio_Play(MUS_STOP);
     } else {
         unsafe { Ticker = Some(DoGameTicker) };
-        unsafe { Drawer = Some(DoGameDrawer) };
+        unsafe { Drawer = Some(do_game_drawer) };
         Audio_Play(game.music.load(Ordering::Relaxed) as i32);
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
@@ -387,7 +386,7 @@ pub fn game_pause(state: bool) {
 #[unsafe(no_mangle)]
 pub extern "C" fn do_game_responder() {
     // Pull current C state in, act on GAME_STATE (incl. game_pause), push back out
-    // so the still-C DoGameTicker/DoGameDrawer see pause/music/mode changes.
+    // so the C code (miner/robots) sees pause/music/mode changes.
     sync_c_to_rust();
 
     let game = &*GAME_STATE;
@@ -813,8 +812,10 @@ pub extern "C" fn Game_GotItem() {
     sync_rust_to_c();
 }
 
-// Ported from C's ClockTicker. Now called from Rust's DoGameTicker.
-// Reads/writes GAME_STATE, so it uses sync bookends.
+// Ported from C's ClockTicker, but NOT yet wired in: the live game loop is still
+// C's DoGameTicker, which calls C's ClockTicker (game.c). Hook this up when
+// DoGameTicker itself is ported — and note it reads/writes GAME_STATE, so it'll
+// need the sync bookends (or to run inside an already-synced Rust ticker).
 #[unsafe(no_mangle)]
 pub extern "C" fn clock_ticker() {
     sync_c_to_rust();
