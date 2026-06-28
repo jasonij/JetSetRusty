@@ -6,7 +6,9 @@ use crate::gameover::Gameover_Action;
 use crate::levels::{self, Level_Drawer};
 use crate::misc::Timer;
 use crate::rope;
-use crate::video::{Video_PixelInkFill, Video_PixelPaperFill, Video_WriteLarge};
+use crate::video::{
+    Video_CycleColours, Video_PixelInkFill, Video_PixelPaperFill, Video_WriteLarge,
+};
 
 use crate::cheat::cheatEnabled;
 use crate::common::{
@@ -30,6 +32,8 @@ use crate::common::{
     // Types
     Event,
     Key,
+    // C functions
+    Level_SetBorder,
     MinerWilly,
 
     // Constant(s)
@@ -76,7 +80,6 @@ pub static mut ROPE_TICKER: Option<extern "C" fn() -> ()> = None;
 unsafe extern "C" {
     fn DoGameDrawer();
     fn DoGameTicker();
-    fn DoPauseDrawer();
     fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8);
     fn Miner_Drawer();
     fn Miner_Save();
@@ -496,6 +499,21 @@ pub extern "C" fn DoPauseTicker() {
     let old_paused = game.game_paused.fetch_add(1, Ordering::Relaxed);
     if old_paused == 16 * 5 {
         game.game_paused.store(1, Ordering::Relaxed);
+    }
+
+    sync_rust_to_c();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn DoPauseDrawer() {
+    sync_c_to_rust();
+    let game = &*GAME_STATE;
+
+    if game.game_paused.load(Ordering::Relaxed) == 16 * 5 {
+        unsafe {
+            Level_SetBorder();
+            Video_CycleColours();
+        }
     }
 
     sync_rust_to_c();

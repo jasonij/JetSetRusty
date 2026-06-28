@@ -4,6 +4,9 @@
 
 #include "game.h"
 
+// Ported to Rust
+extern void DoPauseDrawer();
+
 int             gameMusic = MUS_PLAY;
 
 int             levelBorder[] =
@@ -121,14 +124,7 @@ void ClockTicker()
 }
 
 
-void DoPauseDrawer()
-{
-    if (gamePaused == 16 * 5)
-    {
-        Level_SetBorder();
-        Video_CycleColours();
-    }
-}
+// DoPauseDrawer - ported to game.rs
 
 void DoGameDrawer()
 {
