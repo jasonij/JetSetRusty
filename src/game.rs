@@ -539,10 +539,14 @@ pub extern "C" fn Game_GameReset() {
     *game.score_items.lock().unwrap() = 0;
 
     // gameScoreClock[0] = 0; gameScoreClock[1] = 7; gameScoreClock[2] = 0
-    let mut clock = game.score_clock.lock().unwrap();
-    clock[0] = 0;
-    clock[1] = 7;
-    clock[2] = 0;
+    // Use scope to drop clock guard before sync_rust_to_c()
+    {
+        let mut clock = game.score_clock.lock().unwrap();
+        clock[0] = 0;
+        clock[1] = 7;
+        clock[2] = 0;
+        // clock guard dropped here at end of scope
+    }
 
     // DoClockUpdate = DoDrawClock
     unsafe {
