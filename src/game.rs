@@ -635,7 +635,11 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
         {
             // minerWilly.air = 2; return
             drop(miner); // release the lock before we mutate
-            game.miner.lock().unwrap().air = 2;
+            {
+                let mut miner = game.miner.lock().unwrap();
+                miner.air = 2;
+                // miner guard dropped here at end of scope
+            }
             sync_rust_to_c();
             return;
         }
@@ -730,7 +734,11 @@ pub extern "C" fn DoGameTicker() {
     }
 
     // Update game frame
-    let frame = unsafe { Timer_Update(&mut *game.timer.lock().unwrap()) };
+    // Use scope to drop timer guard before sync_rust_to_c()
+    let frame = unsafe {
+        let mut timer = game.timer.lock().unwrap();
+        Timer_Update(&mut *timer)
+    };
     game.frame.store(frame, Ordering::Relaxed);
     if frame == 0 {
         sync_rust_to_c();
