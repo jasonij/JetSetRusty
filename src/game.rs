@@ -310,8 +310,13 @@ pub extern "C" fn game_init_room() {
 
     // System_border is a C function into which we send data from Rust
     // levelBorder[gameLevel] -> game.level_border[level]
-    unsafe {
-        System_Border(game.level_border.lock().unwrap()[current_level as usize]);
+    // Use scope to drop level_border guard before sync_rust_to_c()
+    {
+        let border_value = game.level_border.lock().unwrap()[current_level as usize];
+        unsafe {
+            System_Border(border_value);
+        }
+        // border guard dropped here at end of scope
     }
 
     unsafe {
@@ -325,7 +330,11 @@ pub extern "C" fn game_init_room() {
     }
 
     // Timer
-    Timer_Set(&mut *game.timer.lock().unwrap(), 12, TICKRATE);
+    // Use scope to drop timer guard before sync_rust_to_c()
+    {
+        Timer_Set(&mut *game.timer.lock().unwrap(), 12, TICKRATE);
+        // timer guard dropped here at end of scope
+    }
     game.frame.store(1, Ordering::Relaxed);
     game.inactivity_timer.store(0, Ordering::Relaxed);
     game.miner_willy_rope.store(0, Ordering::Relaxed);
