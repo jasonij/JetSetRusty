@@ -799,7 +799,9 @@ pub extern "C" fn DoGameTicker() {
 
     // Tick rope
     unsafe {
-        Rope_Ticker();
+        if let Some(f) = rope::Rope_Ticker {
+            f();
+        }
     }
 
     // Tick clock - use Rust version now
