@@ -970,6 +970,7 @@ pub extern "C" fn Game_DrawStatus() {
 }
 
 fn sync_rust_to_c() {
+    eprintln!("sync_rust_to_c: START");
     unsafe {
         // Atomic fields -> C globals
         c_game_level = GAME_STATE.level.load(Ordering::Relaxed);
@@ -986,15 +987,22 @@ fn sync_rust_to_c() {
         c_miner_willy_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
 
         // Mutex fields -> C globals
+        eprintln!("  locking level_border");
         c_level_border = *GAME_STATE.level_border.lock().unwrap();
+        eprintln!("  locking score_clock");
         c_game_score_clock = *GAME_STATE.score_clock.lock().unwrap();
+        eprintln!("  locking score_items");
         c_game_score_items = *GAME_STATE.score_items.lock().unwrap();
+        eprintln!("  locking timer");
         c_game_timer = *GAME_STATE.timer.lock().unwrap();
+        eprintln!("  locking miner");
         c_miner_willy = *GAME_STATE.miner.lock().unwrap();
     }
+    eprintln!("sync_rust_to_c: DONE");
 }
 
 fn sync_c_to_rust() {
+    eprintln!("sync_c_to_rust: START");
     unsafe {
         // C globals -> Atomic fields
         GAME_STATE.level.store(c_game_level, Ordering::Relaxed);
@@ -1025,12 +1033,18 @@ fn sync_c_to_rust() {
             .store(c_miner_willy_rope, Ordering::Relaxed);
 
         // C globals -> Mutex fields
+        eprintln!("  locking level_border");
         *GAME_STATE.level_border.lock().unwrap() = c_level_border;
+        eprintln!("  locking score_clock");
         *GAME_STATE.score_clock.lock().unwrap() = c_game_score_clock;
+        eprintln!("  locking score_items");
         *GAME_STATE.score_items.lock().unwrap() = c_game_score_items;
+        eprintln!("  locking timer");
         *GAME_STATE.timer.lock().unwrap() = c_game_timer;
+        eprintln!("  locking miner");
         *GAME_STATE.miner.lock().unwrap() = c_miner_willy;
     }
+    eprintln!("sync_c_to_rust: DONE");
 }
 
 #[allow(non_snake_case)]
