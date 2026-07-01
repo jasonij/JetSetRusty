@@ -856,7 +856,12 @@ pub extern "C" fn Game_GotItem() {
 // need the sync bookends (or to run inside an already-synced Rust ticker).
 #[unsafe(no_mangle)]
 pub extern "C" fn clock_ticker() {
-    sync_c_to_rust();
+    // NOTE: no sync bookends here. clock_ticker is only ever called from inside
+    // DoGameTicker, which already syncs on entry and exit. A nested sync_c_to_rust
+    // here reloaded GAME_STATE.timer from the not-yet-synced C gameTimer, discarding
+    // this frame's Timer_Update result and wedging the frame gate (physics every
+    // frame). clock_ticker only touches clock_ticks/score_clock, which the C physics
+    // never write, so operating on the already-synced GAME_STATE is correct.
 
     // [ed: porting comments over directly]
     // 256 frames = 1 game minute
@@ -896,7 +901,6 @@ pub extern "C" fn clock_ticker() {
     unsafe {
         DO_CLOCK_UPDATE = Some(DoDrawClock);
     }
-    sync_rust_to_c();
 }
 
 pub fn game_draw_lives() {
@@ -970,7 +974,6 @@ pub extern "C" fn Game_DrawStatus() {
 }
 
 fn sync_rust_to_c() {
-    eprintln!("sync_rust_to_c: START");
     unsafe {
         // Atomic fields -> C globals
         c_game_level = GAME_STATE.level.load(Ordering::Relaxed);
@@ -987,22 +990,15 @@ fn sync_rust_to_c() {
         c_miner_willy_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
 
         // Mutex fields -> C globals
-        eprintln!("  locking level_border");
         c_level_border = *GAME_STATE.level_border.lock().unwrap();
-        eprintln!("  locking score_clock");
         c_game_score_clock = *GAME_STATE.score_clock.lock().unwrap();
-        eprintln!("  locking score_items");
         c_game_score_items = *GAME_STATE.score_items.lock().unwrap();
-        eprintln!("  locking timer");
         c_game_timer = *GAME_STATE.timer.lock().unwrap();
-        eprintln!("  locking miner");
         c_miner_willy = *GAME_STATE.miner.lock().unwrap();
     }
-    eprintln!("sync_rust_to_c: DONE");
 }
 
 fn sync_c_to_rust() {
-    eprintln!("sync_c_to_rust: START");
     unsafe {
         // C globals -> Atomic fields
         GAME_STATE.level.store(c_game_level, Ordering::Relaxed);
@@ -1033,18 +1029,12 @@ fn sync_c_to_rust() {
             .store(c_miner_willy_rope, Ordering::Relaxed);
 
         // C globals -> Mutex fields
-        eprintln!("  locking level_border");
         *GAME_STATE.level_border.lock().unwrap() = c_level_border;
-        eprintln!("  locking score_clock");
         *GAME_STATE.score_clock.lock().unwrap() = c_game_score_clock;
-        eprintln!("  locking score_items");
         *GAME_STATE.score_items.lock().unwrap() = c_game_score_items;
-        eprintln!("  locking timer");
         *GAME_STATE.timer.lock().unwrap() = c_game_timer;
-        eprintln!("  locking miner");
         *GAME_STATE.miner.lock().unwrap() = c_miner_willy;
     }
-    eprintln!("sync_c_to_rust: DONE");
 }
 
 #[allow(non_snake_case)]
