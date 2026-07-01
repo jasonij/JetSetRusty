@@ -49,13 +49,34 @@ These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs
 | `levels.rs` | Level data and room layout definitions |
 | `rope.rs` | Rope swing physics and rendering |
 | `codes.rs` | Copy-protection code entry and validation |
-| `game.rs` | **In-progress** port of `game.c`/`game.h` — currently mostly `unimplemented!()` stubs and shared constants/enums. Don't assume any function here works yet; check the body. |
+| `game.rs` | Port of `game.c`/`game.h` — now nearly complete (no `unimplemented!()` stubs remain). Owns `Game_Action`, `DoGameTicker`, `do_game_drawer`, `game_init_room`, `clock_ticker`, `Game_ChangeLevel`, `Game_GameReset`, `game_pause`, and the `GAME_STATE` shadow-state model (see below). Still calls into C for miner/robot/rope physics. |
 
 ### Still in C (compiled via `build.rs`)
 
-`game.c`, `miner.c`, `robots.c` — these still implement `Game_Action`, miner physics, and robot movement. `build.rs` compiles only those three; everything else linked in is from Rust.
+`build.rs` compiles exactly three C files: `game.c`, `miner.c`, `robots.c`.
+
+- `miner.c` — miner (Willy) physics: the `Miner_*` functions.
+- `robots.c` — robot movement: the `Robots_*` functions.
+- `game.c` — **data only now.** Its functions are all ported to Rust; what remains is the definitions of the shared C globals (`gameLevel`, `gameLives`, `minerWilly`, `levelBorder`, `gameScoreClock`, `gameTimer`, …). These globals are still the source of truth that the C physics code reads and writes.
+
+`Level_Ticker`/`level_init` (in `levels.rs`) and `Rope_Ticker`/`Rope_Init` (in `rope.rs`) are Rust, but `game.rs` still calls them through `unsafe extern "C"` decls because of their exported ABI.
 
 Note: `src/game_main.c`, `src/title.c`, `src/levels.c`, `src/rope.c`, and `src/codes.c` exist on disk (originals before porting) but are **not compiled** and should not be edited — they're reference material for the in-flight ports.
+
+### GAME_STATE shadow-state & C↔Rust sync (read before touching `game.rs`)
+
+The port is mid-migration: still-C code (`miner.c`, `robots.c`) reads and writes the raw C globals (`gameLevel`, `minerWilly`, …), while ported Rust code works against `GAME_STATE`, a `LazyLock<GameState>` Rust-side shadow of those globals. `GameState` mixes cheap `Atomic*` fields (level, lives, frame, clock_ticks, item_count, …) with `Mutex<>` fields for the compound ones (`miner`, `timer`, `level_border`, `score_clock`, `score_items`). The C globals are aliased into Rust via `#[link_name]` (imported as `c_game_level`, `c_miner_willy`, … plus `cheatEnabled`).
+
+Two private functions in `game.rs` bridge the two worlds:
+
+- `sync_c_to_rust()` — copy every C global into `GAME_STATE`.
+- `sync_rust_to_c()` — copy `GAME_STATE` back out to the C globals.
+
+**The pattern** for a Rust function that shares state with still-C code: call `sync_c_to_rust()` on entry, operate on `GAME_STATE`, then `sync_rust_to_c()` on exit.
+
+**Deadlock rule (the one that keeps biting — cause of the last several commits):** `sync_c_to_rust`/`sync_rust_to_c` lock *every* `Mutex` field. So **never hold a `GAME_STATE` mutex guard across a call to either sync function** — a `let`-bound guard (`timer`, `miner`, `level_border`, `score_clock`) that's still alive when `sync_*` runs self-deadlocks and freezes the game. Wrap the guard in an explicit `{ }` scope so it drops before the sync call. See the `game-state-guard-across-sync-deadlock` memory.
+
+The sync functions currently carry `eprintln!` tracing (and there's an "LLM Slop" `Display` impl on `GameState`) added to hunt these deadlocks — scaffolding to remove once the sync path is stable.
 
 ### FFI Conventions
 
