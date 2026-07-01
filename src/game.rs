@@ -381,7 +381,13 @@ pub fn game_pause(state: bool) {
         Audio_Play(game.music.load(Ordering::Relaxed) as i32);
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
-        if (game.cheat_enabled.load(Ordering::Relaxed)) {
+        // Original: `if (cheatEnabled == 0)`. Redraw the status band on unpause
+        // when NOT cheating — DoPauseDrawer's Video_CycleColours has been
+        // cycling the ink of every pixel in the buffer, and the level playfield
+        // recovers because it's repainted every frame, but the status/lives band
+        // is only painted here. Without this redraw it keeps the last cycled
+        // colour. (The condition was inverted, so it never fired in normal play.)
+        if !game.cheat_enabled.load(Ordering::Relaxed) {
             game_draw_status();
             // Use scope to drop level_border guard before function returns
             {
@@ -766,6 +772,14 @@ pub extern "C" fn DoGameTicker() {
     // Tick miner
     unsafe {
         Miner_Ticker();
+        // Miner_Ticker reads live key state and mutates the C-owned minerWilly
+        // (movement/jump). Refresh the shadow from C now, or the GM_RUNNING /
+        // GM_MARIA reads below — and the exit sync_rust_to_c() — would write the
+        // stale pre-physics miner back over Willy's movement (the "Willy won't
+        // respond to input" bug). minerWilly is the only miner state that the
+        // sync round-trips, so a targeted pull is enough; a full sync_c_to_rust
+        // here would revert this frame's gate/mode work.
+        *GAME_STATE.miner.lock().unwrap() = c_miner_willy;
     }
 
     // GM_RUNNING mode
