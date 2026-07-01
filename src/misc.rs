@@ -114,8 +114,12 @@ pub static videoColour: [Colour; 16] = [
 #[derive(Clone, Copy, Default)]
 #[repr(C)]
 pub struct Timer {
-    pub acc: i32,
+    // Field order MUST match the C `TIMER` in misc.h ({rate, acc, remainder,
+    // divisor}). This struct is aliased over the C globals (gameTimer via
+    // link_name) and passed by pointer to Timer_Set/Timer_Update from C
+    // (miner.c's minerTimer), so the layout is a real ABI contract.
     pub rate: i32,
+    pub acc: i32,
     pub remainder: i32,
     pub divisor: i32,
 }
@@ -123,8 +127,8 @@ pub struct Timer {
 impl std::fmt::Debug for Timer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Timer")
-            .field("acc", &self.acc)
             .field("rate", &self.rate)
+            .field("acc", &self.acc)
             .field("remainder", &self.remainder)
             .field("divisor", &self.divisor)
             .finish()

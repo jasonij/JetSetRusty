@@ -340,7 +340,15 @@ pub fn run() {
         remainder: 0,
         divisor: 0,
     };
-    Timer_Set(&raw mut timer_frame, TICKRATE, mode.refresh_rate);
+    // SDL reports refresh_rate == 0 when the rate is unspecified (headless,
+    // Xvfb, some virtual displays). Fall back to TICKRATE so Timer_Set doesn't
+    // divide by zero — this makes the frame gate run one tick per frame.
+    let refresh_rate = if mode.refresh_rate == 0 {
+        TICKRATE
+    } else {
+        mode.refresh_rate
+    };
+    Timer_Set(&raw mut timer_frame, TICKRATE, refresh_rate);
     Timer_Set(&raw mut timer_flash, 25, TICKRATE * 8);
 
     // Main loop ---------------------------------------------------------------
