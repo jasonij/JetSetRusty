@@ -8,6 +8,7 @@ mod game_main;
 mod gameover;
 mod levels;
 mod loader;
+mod miner;
 mod misc;
 mod rope;
 mod title;

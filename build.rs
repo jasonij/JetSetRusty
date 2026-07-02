@@ -27,7 +27,7 @@ fn main() {
     }
 
     // pants
-    let c_sources = ["src/game.c", "src/miner.c", "src/robots.c"];
+    let c_sources = ["src/game.c", "src/robots.c"];
     for src in &c_sources {
         build.file(src);
     }
