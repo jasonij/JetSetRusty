@@ -698,10 +698,16 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
         // miner guard dropped here at end of scope
     }
 
-    // Game_InitRoom()
-    game_init_room();
-
+    // game_init_room() reads the raw C globals — level_init / Robots_Init /
+    // Miner_Save all use gameLevel / minerWilly directly — and it re-syncs
+    // C->shadow on entry. Push our shadow changes (the new gameLevel and the
+    // repositioned Willy) out to C *first*, or game_init_room's entry
+    // sync_c_to_rust reloads the stale old level and re-inits the CURRENT room
+    // instead of the new one. That was the "can't leave the room" bug — a nested
+    // sync-bracket trap (see the memory of the same name). game_init_room's own
+    // exit sync leaves C/shadow consistent, so no trailing sync is needed here.
     sync_rust_to_c();
+    game_init_room();
 }
 
 #[unsafe(no_mangle)]
