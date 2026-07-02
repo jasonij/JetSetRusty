@@ -10,6 +10,7 @@ mod levels;
 mod loader;
 mod miner;
 mod misc;
+mod robots;
 mod rope;
 mod title;
 mod video;
