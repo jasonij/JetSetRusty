@@ -16,11 +16,11 @@ cargo run             # run the game
 
 **Required system libraries:** `libsdl2-dev libsdl2-mixer-dev build-essential`
 
-`build.rs` uses the `cc` crate to compile remaining C files and links them via pkg-config (SDL2, SDL2_mixer). It also sets `env!("BUILD")` to a datestamped version string used in the loader screen.
+`build.rs` links SDL2 and SDL2_mixer via pkg-config and sets `env!("BUILD")` to a datestamped version string used in the loader screen. **No C is compiled** — the game is 100% Rust.
 
 ## Architecture
 
-The game uses a **hybrid Rust/C approach** — modules are ported one at a time. Both the entry point (`main.rs`) and the main loop (`game_main.rs::run`) live in Rust; `game_main.rs` owns SDL2 window/audio setup and drives the loop via four global function pointers:
+The C→Rust port is **code-complete: the game is 100% Rust** (no C is compiled). What remains of the C era is a set of shared mutable globals that still carry the C ABI (`#[no_mangle]`/`#[link_name]`) and a `GAME_STATE` shadow that mirrors them — transitional scaffolding being dissolved (see below). Both the entry point (`main.rs`) and the main loop (`game_main.rs::run`) live in Rust; `game_main.rs` owns SDL2 window/audio setup and drives the loop via four global function pointers:
 
 ```
 Action    — current game state handler (runs once per frame, then sets itself to DoNothing)
@@ -29,7 +29,7 @@ Ticker    — logic/physics update
 Drawer    — rendering
 ```
 
-These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs` (and re-exported by `common.rs`); remaining C code references them via `extern`. Each state transition works by re-assigning the pointer (e.g., `Action = Some(Title_Action)`). The `Event` type is `Option<unsafe extern "C" fn()>`, so an unset slot is `None` and behaves as a no-op.
+These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs` (and re-exported by `common.rs`); sibling modules reference them via `extern` (a holdover from the C ABI — the symbols are Rust-defined now). Each state transition works by re-assigning the pointer (e.g., `Action = Some(Title_Action)`). The `Event` type is `Option<unsafe extern "C" fn()>`, so an unset slot is `None` and behaves as a no-op.
 
 ### Ported to Rust (`src/*.rs`)
 
@@ -52,20 +52,24 @@ These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs
 | `game.rs` | Port of `game.c`/`game.h` — now nearly complete (no `unimplemented!()` stubs remain). Owns `Game_Action`, `DoGameTicker`, `do_game_drawer`, `game_init_room`, `clock_ticker`, `Game_ChangeLevel`, `Game_GameReset`, `game_pause`, and the `GAME_STATE` shadow-state model (see below). Calls robot physics (`Robots_*`) — now the Rust impls in `robots.rs`, via C-ABI extern decls. |
 | `miner.rs` | Port of `miner.c` — Willy physics (`Miner_*`): input, jump/fall/walk, ramps/conveyors, collision, item pickup, sprite rendering. Defines the `minerWilly` / `minerWillyRope` / `minerAttrSplit` C-ABI globals — still `#[no_mangle]` because `robots.rs` reads them through the `c_miner_willy*` `#[link_name]` aliases as part of the sync model (no C reads them anymore). |
 | `robots.rs` | Port of `robots.c` — the guardians: per-room hostile sprites, the toilet, Maria, the two screen-crossing arrows. Robot state (`robotThis[8]`, the `curRobot` cursor) was file-static and is now Rust-private (no `#[repr(C)]`/`#[no_mangle]`); only the five `Robots_*` entry points keep their C ABI, since `game.rs`/`title.rs` still call them by name. Reads `minerWilly.{y,air}`, `gameClockTicks`, `gameLevel`, `gameMode` straight through the `c_*` aliases (never `GAME_STATE` — it runs mid-frame inside the already-synced game.rs callers). |
+| `cglobals.rs` | The 13 shared globals relocated verbatim from the deleted `game.c` (`gameLevel`, `gameLives`, `levelBorder`, `gameScoreClock`, `gameTimer`, …), as `#[unsafe(no_mangle)]` Rust statics keeping their C names. **Transitional scaffolding** — Milestone 2 dissolves each into `GAME_STATE` and deletes this module. |
 
-### Still in C (compiled via `build.rs`)
+### Shared C-ABI globals (transitional — no C is compiled)
 
-`build.rs` compiles exactly one C file: `game.c` — and it is **data only**. No C *code* executes anymore; every C function has been ported to Rust.
+`build.rs` compiles **no** C files. What remains of the C era is a set of shared mutable globals that still use the C ABI, so that the various modules touching them keep linking:
 
-- `game.c` — the definitions of the shared C globals (`gameLevel`, `gameLives`, `levelBorder`, `gameScoreClock`, `gameTimer`, …). These globals remain the source of truth that the Rust physics code reads and writes through the `c_*` `#[link_name]` aliases. (`minerWilly` & friends are defined in `miner.rs` instead, via `#[no_mangle]`.) The next milestone is to move these definitions into Rust and drop `game.c` (and the C compile) entirely.
+- `cglobals.rs` — the 13 ex-`game.c` globals, now `#[unsafe(no_mangle)]` Rust statics. They keep their C names so `common.rs`'s `c_*` `#[link_name]` aliases and the per-file `extern` blocks in `title/cheat/die/rope/levels` still resolve to them unchanged.
+- `miner.rs` — `minerWilly` / `minerWillyRope` / `minerAttrSplit`, likewise `#[no_mangle]`.
 
-`Level_Ticker`/`level_init` (`levels.rs`), `Rope_Ticker`/`Rope_Init` (`rope.rs`), the `Miner_*` functions (`miner.rs`), and the `Robots_*` functions (`robots.rs`) are all Rust, but `game.rs`/`title.rs`/`die.rs` still call them through `unsafe extern "C"` decls because of their exported ABI.
+These remain the source of truth that the ported code reads/writes; `GAME_STATE` shadows them (see below). The next milestone dissolves each into `GAME_STATE` and deletes the `#[no_mangle]` globals plus the sync layer — at which point `cglobals.rs` disappears.
 
-Note: `src/game_main.c`, `src/levels.c`, `src/rope.c`, `src/codes.c`, `src/miner.c`, and `src/robots.c` exist on disk (originals before porting) but are **not compiled** and should not be edited — they're reference material for the completed ports. Only `src/game.c` is still compiled.
+`Level_Ticker`/`level_init` (`levels.rs`), `Rope_Ticker`/`Rope_Init` (`rope.rs`), the `Miner_*` functions (`miner.rs`), and the `Robots_*` functions (`robots.rs`) are all called through `unsafe extern "C"` decls from `game.rs`/`title.rs`/`die.rs` because of their exported ABI — Rust-to-Rust across a C ABI boundary that no longer needs to exist.
+
+Note: `src/game_main.c`, `src/levels.c`, `src/rope.c`, `src/codes.c`, `src/miner.c`, `src/robots.c`, and the `src/*.h` headers exist on disk (originals before porting) but are **not compiled** and should not be edited — they're reference material for the completed ports.
 
 ### GAME_STATE shadow-state & C↔Rust sync (read before touching `game.rs`)
 
-The port is mid-migration: the shared state still lives in C globals (`gameLevel`, `minerWilly`, …) defined in `game.c`/`miner.rs`, while ported Rust code works against `GAME_STATE`, a `LazyLock<GameState>` Rust-side shadow of those globals. (Now that `robots.c` is ported, *all* readers/writers are Rust — but the two-world sync model still stands until the global definitions themselves move into Rust.) `GameState` mixes cheap `Atomic*` fields (level, lives, frame, clock_ticks, item_count, …) with `Mutex<>` fields for the compound ones (`miner`, `timer`, `level_border`, `score_clock`, `score_items`). The C globals are aliased into Rust via `#[link_name]` (imported as `c_game_level`, `c_miner_willy`, … plus `cheatEnabled`).
+The port is mid-migration: the shared state still lives in C-ABI globals (`gameLevel`, `minerWilly`, …) defined in `cglobals.rs`/`miner.rs`, while ported Rust code works against `GAME_STATE`, a `LazyLock<GameState>` Rust-side shadow of those globals. (The definitions are now all Rust and *all* readers/writers are Rust — but the two-world sync model still stands until the globals are dissolved into `GAME_STATE`.) `GameState` mixes cheap `Atomic*` fields (level, lives, frame, clock_ticks, item_count, …) with `Mutex<>` fields for the compound ones (`miner`, `timer`, `level_border`, `score_clock`, `score_items`). The C globals are aliased into Rust via `#[link_name]` (imported as `c_game_level`, `c_miner_willy`, … plus `cheatEnabled`).
 
 Two private functions in `game.rs` bridge the two worlds:
 

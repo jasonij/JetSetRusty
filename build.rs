@@ -1,53 +1,21 @@
 use std::process::Command;
 
 fn main() {
-    let sdl2 = pkg_config::probe_library("sdl2").unwrap();
-    let sdl2_mixer = pkg_config::probe_library("SDL2_mixer").unwrap();
+    // No C is compiled anymore — the whole game is Rust. We still link SDL2 and
+    // SDL2_mixer, which the Rust code calls (game_main.rs owns the window and
+    // audio setup; the SDL2_mixer symbols come in via raw FFI, since the sdl2
+    // crate's `mixer` feature is off). probe_library emits the
+    // cargo:rustc-link-{search,lib} directives as a side effect.
+    pkg_config::probe_library("sdl2").unwrap();
+    pkg_config::probe_library("SDL2_mixer").unwrap();
+
+    // Datestamped version string, exposed to Rust as env!("BUILD") and shown on
+    // the loader screen.
     let date = Command::new("date")
         .arg("+%y.%m.%d")
         .output()
         .expect("failed to run date!")
         .stdout;
-
     let date = String::from_utf8(date).unwrap().trim().to_string();
-    let build_str = format!("1.0.0 {}", date);
-    // Expose BUILD to Rust via env!("BUILD")
-    println!("cargo:rustc-env=BUILD={}", build_str);
-    // Pass it to the C compiler as a string literal
-    let build_string = format!("\"{}\"", build_str);
-
-    let mut build = cc::Build::new();
-
-    for path in &sdl2.include_paths {
-        build.include(path);
-    }
-
-    for path in &sdl2_mixer.include_paths {
-        build.include(path);
-    }
-
-    // pants
-    let c_sources = ["src/game.c"];
-    for src in &c_sources {
-        build.file(src);
-    }
-    build
-        .define("BUILD", build_string.as_str())
-        .compile("jetsetrusty");
-
-    // Recompile the C side when any of its sources or headers change. Without
-    // these, Cargo only re-runs build.rs on a coarse package scan and the .c
-    // objects can go stale (e.g. de-static'ing a global doesn't take effect).
-    for src in &c_sources {
-        println!("cargo:rerun-if-changed={src}");
-    }
-    for entry in std::fs::read_dir("src").expect("read src/") {
-        let path = entry.expect("dir entry").path();
-        if path.extension().is_some_and(|e| e == "h") {
-            println!("cargo:rerun-if-changed={}", path.display());
-        }
-    }
-
-    println!("cargo:rustc-link-lib=SDL2");
-    println!("cargo:rustc-link-lib=SDL2_mixer");
+    println!("cargo:rustc-env=BUILD=1.0.0 {date}");
 }
