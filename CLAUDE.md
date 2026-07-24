@@ -65,7 +65,7 @@ These remain the source of truth that the ported code reads/writes; `GAME_STATE`
 
 `Level_Ticker`/`level_init` (`levels.rs`), `Rope_Ticker`/`Rope_Init` (`rope.rs`), the `Miner_*` functions (`miner.rs`), and the `Robots_*` functions (`robots.rs`) are all called through `unsafe extern "C"` decls from `game.rs`/`title.rs`/`die.rs` because of their exported ABI — Rust-to-Rust across a C ABI boundary that no longer needs to exist.
 
-Note: `src/game_main.c`, `src/levels.c`, `src/rope.c`, `src/codes.c`, `src/miner.c`, `src/robots.c`, and the `src/*.h` headers exist on disk (originals before porting) but are **not compiled** and should not be edited — they're reference material for the completed ports.
+Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The complete original C/SDL2 implementation lives, buildable, in **`reference/c-original/`**: a pristine snapshot of upstream `github.com/fawtytoo/JetSetWilly` at this repo's `db7fc50` import, with its own `Makefile` (`make` there builds it with gcc + libSDL2 — no mixer). It is **not compiled by Cargo** and is reference only; see `reference/c-original/PROVENANCE.md`. The exact *as-transcribed* version of any ported module stays in git history (e.g. `git show <pre-port-commit>:src/robots.c`).
 
 ### GAME_STATE shadow-state & C↔Rust sync (read before touching `game.rs`)
 
