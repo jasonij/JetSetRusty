@@ -1,10 +1,11 @@
 use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
 use crate::cheat::cheatEnabled;
 use crate::common::{Action, Drawer, HEIGHT, Key, Responder, Ticker, WIDTH, gameInput, videoFlash};
-use crate::game::Game_Action;
+use crate::game::{GAME_STATE, Game_Action};
 use crate::levels::{Level_ItemCount, Level_RestoreItems};
 use crate::video::{tile_2_pixel, video_pixel_fill};
 use std::ptr::addr_of_mut;
+use std::sync::atomic::Ordering;
 
 unsafe extern "C" {
     fn Game_GameReset();
@@ -18,9 +19,7 @@ unsafe extern "C" {
     fn DoQuit();
     fn DoNothing();
     static mut gameLevel: i32;
-    static mut itemCount: i32;
     static mut gameMode: i32;
-    static mut gamePaused: i32;
 }
 
 const MUS_TITLE: i32 = 0;
@@ -56,7 +55,9 @@ unsafe extern "C" fn game_start() {
         Game_DrawStatus();
 
         gameLevel = THEBATHROOM;
-        itemCount = Level_ItemCount();
+        GAME_STATE
+            .item_count
+            .store(Level_ItemCount(), Ordering::Relaxed);
         Level_RestoreItems();
 
         Miner_Init();
@@ -66,7 +67,7 @@ unsafe extern "C" fn game_start() {
         }
 
         gameMode = GM_NORMAL;
-        gamePaused = 0;
+        GAME_STATE.game_paused.store(0, Ordering::Relaxed);
 
         Game_Action();
     }

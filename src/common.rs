@@ -110,23 +110,15 @@ pub fn system_set_pixel(pos: i32, ink: i32) {
 // game.rs. `cheatEnabled` is deliberately absent: it is Rust-owned (cheat.rs)
 // and already a single shared symbol.
 //
-// Only globals with a reader outside game.rs remain here; the game.rs-only ones
-// (music, frame, inactivity_timer, level_border, score_clock, score_items,
-// timer) have been dissolved into GAME_STATE.
+// Only globals with a reader outside game.rs remain here; the rest have been
+// dissolved into GAME_STATE (music/frame/inactivity_timer/level_border/
+// score_clock/score_items/timer, then clock_ticks/game_paused/item_count/lives).
 unsafe extern "C" {
     // Game state
     #[link_name = "gameLevel"]
     pub static mut c_game_level: i32;
-    #[link_name = "gameLives"]
-    pub static mut c_game_lives: i32;
     #[link_name = "gameMode"]
     pub static mut c_game_mode: i32;
-    #[link_name = "gamePaused"]
-    pub static mut c_game_paused: i32;
-    #[link_name = "gameClockTicks"]
-    pub static mut c_game_clock_ticks: i32;
-    #[link_name = "itemCount"]
-    pub static mut c_item_count: i32;
     #[link_name = "minerAttrSplit"]
     pub static mut c_miner_attr_split: i32;
     #[link_name = "minerWillyRope"]

@@ -1,11 +1,11 @@
 #![allow(non_snake_case, dead_code, non_upper_case_globals)]
 
 use crate::common::{MinerWilly, WIDTH};
-use crate::game::Game_Action;
+use crate::game::{GAME_STATE, Game_Action};
 use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
+use std::sync::atomic::Ordering;
 
 unsafe extern "C" {
-    static mut gameLives: i32;
     static mut audioPanX: i32;
     static mut Action: Option<unsafe extern "C" fn()>;
     static mut Ticker: Option<unsafe extern "C" fn()>;
@@ -50,12 +50,17 @@ extern "C" fn Die_Ticker() {
             return;
         }
 
-        if gameLives < 0 {
+        if GAME_STATE.lives.load(Ordering::Relaxed) < 0 {
             Action = Some(Gameover_Action);
             return;
         }
 
-        Video_DrawSprite(LIVES + gameLives * 16, dieBlank.as_ptr(), 0x0, 0x0);
+        Video_DrawSprite(
+            LIVES + GAME_STATE.lives.load(Ordering::Relaxed) * 16,
+            dieBlank.as_ptr(),
+            0x0,
+            0x0,
+        );
         Miner_Restore();
         Audio_ReduceMusicSpeed();
         Action = Some(Game_Action);
@@ -65,7 +70,7 @@ extern "C" fn Die_Ticker() {
 #[unsafe(no_mangle)]
 extern "C" fn Die_Init() {
     unsafe {
-        gameLives -= 1;
+        GAME_STATE.lives.fetch_sub(1, Ordering::Relaxed);
         dieLevel = 15;
         System_Border(0x0);
         Video_PixelPaperFill(0, 128 * WIDTH, 0x0);

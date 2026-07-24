@@ -12,16 +12,13 @@ use crate::video::{
 
 use crate::cheat::cheatEnabled;
 use crate::common::{
-    // C globals (still-shared: read/written by non-game.rs modules via their own
-    // extern blocks, so GAME_STATE still syncs them). The game.rs-only globals
-    // (music, frame, inactivity_timer, level_border, score_clock, score_items,
-    // timer) have been dissolved into GAME_STATE and are gone from here.
-    c_game_clock_ticks,
+    // C globals still shared with non-game.rs modules via their own extern
+    // blocks, so GAME_STATE still syncs them: gameLevel/gameMode
+    // (title/miner/robots) and the miner trio. Everything else has been
+    // dissolved into GAME_STATE — most recently clock_ticks (robots), game_paused
+    // & item_count (title), and lives (die).
     c_game_level,
-    c_game_lives,
     c_game_mode,
-    c_game_paused,
-    c_item_count,
     c_miner_attr_split,
     c_miner_willy,
     c_miner_willy_rope,
@@ -299,7 +296,7 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
 // restarting the music) every frame. Must be `extern "C"` to fit `Event`.
 //
 // sync_c_to_rust() pulls the latest raw globals (title/game_start wrote gameLevel,
-// itemCount, &c. directly) into GAME_STATE before we read them; sync_rust_to_c()
+// gameMode directly) into GAME_STATE before we read them; sync_rust_to_c()
 // pushes our writes (gameLevel, minerAttrSplit, …) back out so the modules that
 // still read the raw globals (miner/robots/title/…) see them.
 #[unsafe(no_mangle)]
@@ -1006,11 +1003,7 @@ fn sync_rust_to_c() {
     unsafe {
         // Atomic fields -> C globals
         c_game_level = GAME_STATE.level.load(Ordering::Relaxed);
-        c_game_lives = GAME_STATE.lives.load(Ordering::Relaxed);
         c_game_mode = GAME_STATE.mode.load(Ordering::Relaxed) as i32;
-        c_game_paused = GAME_STATE.game_paused.load(Ordering::Relaxed) as i32;
-        c_game_clock_ticks = GAME_STATE.clock_ticks.load(Ordering::Relaxed);
-        c_item_count = GAME_STATE.item_count.load(Ordering::Relaxed);
         cheatEnabled = GAME_STATE.cheat_enabled.load(Ordering::Relaxed) as i32;
         c_miner_attr_split = GAME_STATE.miner_attr_split.load(Ordering::Relaxed);
         c_miner_willy_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
@@ -1024,15 +1017,7 @@ fn sync_c_to_rust() {
     unsafe {
         // C globals -> Atomic fields
         GAME_STATE.level.store(c_game_level, Ordering::Relaxed);
-        GAME_STATE.lives.store(c_game_lives, Ordering::Relaxed);
         GAME_STATE.mode.store(c_game_mode as u8, Ordering::Relaxed);
-        GAME_STATE
-            .game_paused
-            .store(c_game_paused, Ordering::Relaxed);
-        GAME_STATE
-            .clock_ticks
-            .store(c_game_clock_ticks, Ordering::Relaxed);
-        GAME_STATE.item_count.store(c_item_count, Ordering::Relaxed);
         GAME_STATE
             .cheat_enabled
             .store(cheatEnabled != 0, Ordering::Relaxed);

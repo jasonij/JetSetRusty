@@ -2,12 +2,13 @@
 // Maria, and the two screen-crossing arrows.
 //
 // This is a faithful, behaviour-preserving port. Like miner.rs, it runs
-// mid-frame inside DoGameTicker/do_game_drawer while the C globals are the
-// live source of truth (see the GAME_STATE sync model in CLAUDE.md), so it
-// reads `minerWilly.{y,air}`, `gameClockTicks`, `gameLevel` and `gameMode`
-// straight through the `c_*` link_name aliases in common.rs and never touches
-// GAME_STATE. Going through GAME_STATE here would mean nesting sync brackets
-// inside the already-synced game.rs callers — the documented anti-pattern.
+// mid-frame inside DoGameTicker/do_game_drawer. For the shared C-ABI globals it
+// still needs (`minerWilly.{y,air}`, `gameLevel`, `gameMode`) it reads the raw
+// storage straight through the `c_*` link_name aliases in common.rs, rather
+// than locking GAME_STATE's mutex fields mid-frame and nesting sync brackets
+// inside the already-synced game.rs callers (the documented anti-pattern).
+// `clock_ticks`, now dissolved into GAME_STATE, is read via a plain atomic load
+// — no mutex, no sync, so no nesting risk.
 //
 // Robot state (C `robotThis[8]` and the `curRobot` cursor) was file-static in
 // robots.c and nothing else referenced it, so after this port it is
@@ -16,9 +17,10 @@
 // still call them by that name.
 
 use crate::audio::{Audio_Sfx, audioPanX};
-use crate::common::{WIDTH, c_game_clock_ticks, c_game_level, c_game_mode, c_miner_willy};
-use crate::game::{GameMode, LIVES, MASTERBEDROOM};
+use crate::common::{WIDTH, c_game_level, c_game_mode, c_miner_willy};
+use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
 use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
+use std::sync::atomic::Ordering;
 
 // audio.h SFX enum — audio.rs keeps its copy private, so restate the one we
 // need here.
@@ -1262,7 +1264,7 @@ fn do_move_maria(robot: &mut Robot) {
         } else if c_miner_willy.y < 104 && c_miner_willy.air == 0 {
             robot.f_index = 2;
         } else {
-            robot.f_index = (c_game_clock_ticks & 2) >> 1;
+            robot.f_index = (GAME_STATE.clock_ticks.load(Ordering::Relaxed) & 2) >> 1;
         }
     }
 }
