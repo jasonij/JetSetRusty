@@ -1,0 +1,3 @@
+# Build output (Makefile writes objects to linux/ and the binary to ./jetsetwilly)
+/linux/
+/jetsetwilly
