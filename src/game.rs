@@ -12,20 +12,16 @@ use crate::video::{
 
 use crate::cheat::cheatEnabled;
 use crate::common::{
-    // C globals
+    // C globals (still-shared: read/written by non-game.rs modules via their own
+    // extern blocks, so GAME_STATE still syncs them). The game.rs-only globals
+    // (music, frame, inactivity_timer, level_border, score_clock, score_items,
+    // timer) have been dissolved into GAME_STATE and are gone from here.
     c_game_clock_ticks,
-    c_game_frame,
-    c_game_inactivity_timer,
     c_game_level,
     c_game_lives,
     c_game_mode,
-    c_game_music,
     c_game_paused,
-    c_game_score_clock,
-    c_game_score_items,
-    c_game_timer,
     c_item_count,
-    c_level_border,
     c_miner_attr_split,
     c_miner_willy,
     c_miner_willy_rope,
@@ -262,6 +258,18 @@ impl std::fmt::Display for GameState {
     }
 }
 
+// Per-room border colour, indexed by level. Was the `levelBorder` C global (in
+// game.c, then cglobals.rs); now owned here as the initial value of
+// GAME_STATE.level_border. Constant data — never mutated at runtime.
+const LEVEL_BORDER: [i32; 60] = [
+    5, 4, 6, 2, 3, 1, 2, 1, 4, 2, //
+    2, 4, 6, 5, 1, 3, 2, 1, 2, 1, //
+    2, 1, 4, 4, 1, 1, 5, 2, 3, 2, //
+    2, 2, 2, 2, 1, 1, 5, 6, 2, 2, //
+    1, 1, 2, 5, 3, 4, 1, 2, 4, 5, //
+    5, 2, 1, 2, 5, 1, 2, 2, 5, 5, //
+];
+
 pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     cheat_enabled: AtomicBool::new(false),
     clock_ticks: AtomicI32::new(0),
@@ -270,13 +278,14 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     inactivity_timer: AtomicI32::new(0),
     item_count: AtomicI32::new(0),
     level: AtomicI32::new(0),
-    level_border: Mutex::new([0; 60]),
+    level_border: Mutex::new(LEVEL_BORDER),
     lives: AtomicI32::new(7),
     miner: Mutex::new(Miner::default()),
     miner_attr_split: AtomicI32::new(6),
     miner_willy_rope: AtomicI32::new(0),
     mode: AtomicU8::new(0),
-    music: AtomicU8::new(0),
+    // C: `int gameMusic = MUS_PLAY;` — music on by default.
+    music: AtomicU8::new(MUS_PLAY as u8),
     score_clock: Mutex::new([0, 7, 0]), // 7:00 AM
     score_items: Mutex::new(0),
     timer: Mutex::new(Timer::default()),
@@ -285,14 +294,14 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
 // Game functions
 //
 // Installed as the `Ticker` by Game_Action and runs exactly once: it sets up the
-// room, then swaps `Ticker` to DoGameTicker (still C) and `Action` to DoNothing —
-// that DoNothing handoff is what stops the title's `game_start` from re-firing
-// (and restarting the music) every frame. Must be `extern "C"` to fit `Event`.
+// room, then swaps `Ticker` to DoGameTicker and `Action` to DoNothing — that
+// DoNothing handoff is what stops the title's `game_start` from re-firing (and
+// restarting the music) every frame. Must be `extern "C"` to fit `Event`.
 //
-// sync_c_to_rust() pulls the latest C globals (title/game_start wrote gameLevel,
+// sync_c_to_rust() pulls the latest raw globals (title/game_start wrote gameLevel,
 // itemCount, &c. directly) into GAME_STATE before we read them; sync_rust_to_c()
-// pushes our writes (gameFrame, gameTimer, minerAttrSplit, …) back out so the C
-// ticker/drawer see them.
+// pushes our writes (gameLevel, minerAttrSplit, …) back out so the modules that
+// still read the raw globals (miner/robots/title/…) see them.
 #[unsafe(no_mangle)]
 pub extern "C" fn game_init_room() {
     sync_c_to_rust();
@@ -999,21 +1008,14 @@ fn sync_rust_to_c() {
         c_game_level = GAME_STATE.level.load(Ordering::Relaxed);
         c_game_lives = GAME_STATE.lives.load(Ordering::Relaxed);
         c_game_mode = GAME_STATE.mode.load(Ordering::Relaxed) as i32;
-        c_game_music = GAME_STATE.music.load(Ordering::Relaxed) as i32;
         c_game_paused = GAME_STATE.game_paused.load(Ordering::Relaxed) as i32;
         c_game_clock_ticks = GAME_STATE.clock_ticks.load(Ordering::Relaxed);
-        c_game_frame = GAME_STATE.frame.load(Ordering::Relaxed);
-        c_game_inactivity_timer = GAME_STATE.inactivity_timer.load(Ordering::Relaxed);
         c_item_count = GAME_STATE.item_count.load(Ordering::Relaxed);
         cheatEnabled = GAME_STATE.cheat_enabled.load(Ordering::Relaxed) as i32;
         c_miner_attr_split = GAME_STATE.miner_attr_split.load(Ordering::Relaxed);
         c_miner_willy_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
 
         // Mutex fields -> C globals
-        c_level_border = *GAME_STATE.level_border.lock().unwrap();
-        c_game_score_clock = *GAME_STATE.score_clock.lock().unwrap();
-        c_game_score_items = *GAME_STATE.score_items.lock().unwrap();
-        c_game_timer = *GAME_STATE.timer.lock().unwrap();
         c_miner_willy = *GAME_STATE.miner.lock().unwrap();
     }
 }
@@ -1025,18 +1027,11 @@ fn sync_c_to_rust() {
         GAME_STATE.lives.store(c_game_lives, Ordering::Relaxed);
         GAME_STATE.mode.store(c_game_mode as u8, Ordering::Relaxed);
         GAME_STATE
-            .music
-            .store(c_game_music as u8, Ordering::Relaxed);
-        GAME_STATE
             .game_paused
             .store(c_game_paused, Ordering::Relaxed);
         GAME_STATE
             .clock_ticks
             .store(c_game_clock_ticks, Ordering::Relaxed);
-        GAME_STATE.frame.store(c_game_frame, Ordering::Relaxed);
-        GAME_STATE
-            .inactivity_timer
-            .store(c_game_inactivity_timer, Ordering::Relaxed);
         GAME_STATE.item_count.store(c_item_count, Ordering::Relaxed);
         GAME_STATE
             .cheat_enabled
@@ -1049,10 +1044,6 @@ fn sync_c_to_rust() {
             .store(c_miner_willy_rope, Ordering::Relaxed);
 
         // C globals -> Mutex fields
-        *GAME_STATE.level_border.lock().unwrap() = c_level_border;
-        *GAME_STATE.score_clock.lock().unwrap() = c_game_score_clock;
-        *GAME_STATE.score_items.lock().unwrap() = c_game_score_items;
-        *GAME_STATE.timer.lock().unwrap() = c_game_timer;
         *GAME_STATE.miner.lock().unwrap() = c_miner_willy;
     }
 }

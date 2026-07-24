@@ -114,10 +114,11 @@ pub static videoColour: [Colour; 16] = [
 #[derive(Clone, Copy, Default)]
 #[repr(C)]
 pub struct Timer {
-    // Field order MUST match the C `TIMER` in misc.h ({rate, acc, remainder,
-    // divisor}). This struct is aliased over the C globals (gameTimer via
-    // link_name) and passed by pointer to Timer_Set/Timer_Update from C
-    // (miner.c's minerTimer), so the layout is a real ABI contract.
+    // Field order matches the original C `TIMER` ({rate, acc, remainder,
+    // divisor}). This used to be a live ABI contract — the struct was aliased
+    // over the C `gameTimer` global and passed to Timer_Set/Timer_Update from C.
+    // It's pure Rust with no FFI now (gameTimer dissolved into GAME_STATE.timer),
+    // so `#[repr(C)]` is kept only for provenance and is harmless.
     pub rate: i32,
     pub acc: i32,
     pub remainder: i32,
