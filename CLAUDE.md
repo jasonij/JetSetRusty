@@ -80,7 +80,7 @@ Two private functions in `game.rs` bridge the two worlds:
 
 **Deadlock rule (the one that keeps biting — cause of the last several commits):** `sync_c_to_rust`/`sync_rust_to_c` lock *every* `Mutex` field. So **never hold a `GAME_STATE` mutex guard across a call to either sync function** — a `let`-bound guard (`timer`, `miner`, `level_border`, `score_clock`) that's still alive when `sync_*` runs self-deadlocks and freezes the game. Wrap the guard in an explicit `{ }` scope so it drops before the sync call. See the `game-state-guard-across-sync-deadlock` memory.
 
-The `eprintln!` tracing that once instrumented the sync path has been removed, but a marked "LLM Slop" `Display` impl on `GameState` remains — dead debugging scaffolding, safe to delete once the sync path is trusted.
+The `eprintln!` tracing and the "LLM Slop" `Display` impl on `GameState` that once instrumented the sync path have both been removed.
 
 ### FFI Conventions
 

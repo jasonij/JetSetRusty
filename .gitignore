@@ -1,7 +1,5 @@
 /.cache
 /target
-/linux
-jetsetwilly
 compile_commands.json
 
 .aider.*
