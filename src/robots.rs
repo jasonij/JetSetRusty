@@ -4150,7 +4150,7 @@ pub extern "C" fn Robots_Drawer() {
 #[unsafe(no_mangle)]
 pub extern "C" fn Robots_Init() {
     unsafe {
-        let robots = &raw mut ROBOT_THIS;
+        let robots = &mut *(&raw mut ROBOT_THIS);
         *robots = ROBOT_START[c_game_level as usize];
 
         // Once Maria has been dealt with, the Master Bedroom robots (her two
@@ -4168,7 +4168,7 @@ pub extern "C" fn Robots_Init() {
 pub extern "C" fn Robots_Flush() {
     // The Bathroom's toilet (slot 1) switches to its running frames (2 & 3).
     unsafe {
-        let robots = &raw mut ROBOT_THIS;
+        let robots = &mut *(&raw mut ROBOT_THIS);
         robots[1].f_mask = 0b011;
         robots[1].f_index = 2;
         robots[1].f_update = 0; // slow down the animation
