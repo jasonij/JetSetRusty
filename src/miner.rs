@@ -6,17 +6,22 @@
 // mid-frame inside DoGameTicker/do_game_drawer while the C globals are the live
 // source of truth (see the GAME_STATE sync model in CLAUDE.md). still-C
 // robots.c reads minerWilly.{y,air}, and levels.rs/die.rs/rope.rs/cheat.rs all
-// import `minerWilly`, so `minerWilly` / `minerWillyRope` / `minerAttrSplit`
-// remain #[no_mangle] C-ABI globals defined here until robots.c is ported.
+// import `minerWilly`, so `minerWilly` / `minerWillyRope` remain #[no_mangle]
+// C-ABI globals defined here until robots.c is ported. `minerAttrSplit` is
+// owned by GAME_STATE.miner_attr_split (game.rs) — read via GAME_STATE here
+// rather than through a shared global.
 
 use crate::audio::{Audio_WillySfx, audioPanX};
 use crate::common::{Key, c_game_level, c_game_mode};
 use crate::die::Die_Action;
-use crate::game::{Direction, GameMode, Game_ChangeLevel, Game_GotItem, Miner, NIGHTMAREROOM};
+use crate::game::{
+    Direction, GAME_STATE, GameMode, Game_ChangeLevel, Game_GotItem, Miner, NIGHTMAREROOM,
+};
 use crate::game_main::{Action, System_IsKey};
 use crate::levels::{Level_EraseItem, Level_GetTileRamp, Level_GetTileType, TileType};
 use crate::misc::{Timer, Timer_Set, Timer_Update};
 use crate::video::{Video_DrawMiner, Video_DrawSprite};
+use std::sync::atomic::Ordering;
 
 const D_RIGHT: i32 = 0;
 const D_LEFT: i32 = 1;
@@ -108,8 +113,6 @@ static mut MINER_TIMER: Timer = Timer { rate: 0, acc: 0, remainder: 0, divisor: 
 pub static mut minerWilly: Miner = MINER_ZERO;
 #[unsafe(no_mangle)]
 pub static mut minerWillyRope: i32 = 0;
-#[unsafe(no_mangle)]
-pub static mut minerAttrSplit: i32 = 0;
 
 // YALIGN macro from video.h.
 const fn yalign(y: i32) -> i32 {
@@ -483,7 +486,7 @@ pub extern "C" fn Miner_Drawer() {
         if Video_DrawMiner(
             ((minerWilly.y + offset) << 8) | minerWilly.x,
             MINER_SPRITE[row].as_ptr(),
-            minerAttrSplit,
+            GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
         ) != 0
         {
             Action = Some(Die_Action);

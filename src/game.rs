@@ -14,12 +14,12 @@ use crate::cheat::cheatEnabled;
 use crate::common::{
     // C globals still shared with non-game.rs modules via their own extern
     // blocks, so GAME_STATE still syncs them: gameLevel/gameMode
-    // (title/miner/robots) and the miner trio. Everything else has been
-    // dissolved into GAME_STATE — most recently clock_ticks (robots), game_paused
-    // & item_count (title), and lives (die).
+    // (title/miner/robots) and the miner pair (minerWilly/minerWillyRope).
+    // Everything else has been dissolved into GAME_STATE — most recently
+    // miner_attr_split, clock_ticks (robots), game_paused & item_count (title),
+    // and lives (die).
     c_game_level,
     c_game_mode,
-    c_miner_attr_split,
     c_miner_willy,
     c_miner_willy_rope,
     // Types
@@ -164,6 +164,8 @@ pub struct GameState {
     pub item_count: AtomicI32,
     pub level: AtomicI32,
     pub lives: AtomicI32,
+    // Sole owner (no longer synced to/from a C global); read directly by
+    // miner.rs via GAME_STATE.
     pub miner_attr_split: AtomicI32,
     pub miner_willy_rope: AtomicI32,
     pub mode: AtomicU8,
@@ -958,7 +960,6 @@ fn sync_rust_to_c() {
         c_game_level = GAME_STATE.level.load(Ordering::Relaxed);
         c_game_mode = GAME_STATE.mode.load(Ordering::Relaxed) as i32;
         cheatEnabled = GAME_STATE.cheat_enabled.load(Ordering::Relaxed) as i32;
-        c_miner_attr_split = GAME_STATE.miner_attr_split.load(Ordering::Relaxed);
         c_miner_willy_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
 
         // Mutex fields -> C globals
@@ -974,9 +975,6 @@ fn sync_c_to_rust() {
         GAME_STATE
             .cheat_enabled
             .store(cheatEnabled != 0, Ordering::Relaxed);
-        GAME_STATE
-            .miner_attr_split
-            .store(c_miner_attr_split, Ordering::Relaxed);
         GAME_STATE
             .miner_willy_rope
             .store(c_miner_willy_rope, Ordering::Relaxed);

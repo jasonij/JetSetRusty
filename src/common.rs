@@ -112,15 +112,14 @@ pub fn system_set_pixel(pos: i32, ink: i32) {
 //
 // Only globals with a reader outside game.rs remain here; the rest have been
 // dissolved into GAME_STATE (music/frame/inactivity_timer/level_border/
-// score_clock/score_items/timer, then clock_ticks/game_paused/item_count/lives).
+// score_clock/score_items/timer, then clock_ticks/game_paused/item_count/lives,
+// then miner_attr_split).
 unsafe extern "C" {
     // Game state
     #[link_name = "gameLevel"]
     pub static mut c_game_level: i32;
     #[link_name = "gameMode"]
     pub static mut c_game_mode: i32;
-    #[link_name = "minerAttrSplit"]
-    pub static mut c_miner_attr_split: i32;
     #[link_name = "minerWillyRope"]
     pub static mut c_miner_willy_rope: i32;
 
