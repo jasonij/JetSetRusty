@@ -1,6 +1,6 @@
 #![allow(non_snake_case, dead_code, non_upper_case_globals)]
 
-use crate::common::{MinerWilly, WIDTH};
+use crate::common::WIDTH;
 use crate::game::{GAME_STATE, Game_Action};
 use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
 use std::sync::atomic::Ordering;
@@ -11,7 +11,6 @@ unsafe extern "C" {
     static mut Ticker: Option<unsafe extern "C" fn()>;
     static mut Drawer: Option<unsafe extern "C" fn()>;
     static mut Responder: Option<unsafe extern "C" fn()>;
-    static mut minerWilly: MinerWilly;
     fn Gameover_Action();
     fn DoNothing();
     fn Miner_Restore();
@@ -74,7 +73,9 @@ extern "C" fn Die_Init() {
         dieLevel = 15;
         System_Border(0x0);
         Video_PixelPaperFill(0, 128 * WIDTH, 0x0);
-        audioPanX = minerWilly.x;
+        let miner = GAME_STATE.miner.lock().unwrap();
+        audioPanX = miner.x;
+        drop(miner);
         Audio_Sfx(Sfx::Die as i32);
         Ticker = Some(Die_Ticker);
     }

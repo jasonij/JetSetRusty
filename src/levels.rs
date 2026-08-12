@@ -1,11 +1,10 @@
-use crate::common::{MinerWilly, WIDTH, videoFlash};
+use crate::common::{WIDTH, videoFlash};
 use crate::game::GAME_STATE;
 use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
 use std::sync::atomic::Ordering;
 
 unsafe extern "C" {
     fn System_Border(colour_index: i32); // We'll honour the pondish spelling
-    static mut minerWilly: MinerWilly;
 }
 
 const LEVEL_W: usize = 32;
@@ -5048,7 +5047,8 @@ fn level_get_tile_type(tile: usize) -> TileType {
             TileType::RampLC => TileType::ConveyR,
             TileType::RampRC => TileType::ConveyL,
             TileType::SolidFloor => {
-                if minerWilly.air == 1 && minerWilly.jump == 0 {
+                let miner = GAME_STATE.miner.lock().unwrap();
+                if miner.air == 1 && miner.jump == 0 {
                     TileType::Solid
                 } else {
                     TileType::Floor

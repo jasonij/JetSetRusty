@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 /// rope.rs - Modernized version with proper FFI safety
-use crate::common::{Event, MinerWilly, WIDTH};
+use crate::common::{Event, WIDTH};
 use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{VIDEO_PIXEL, video_draw_rope_seg, video_draw_rope_seg_inner, video_get_pixel};
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -166,11 +166,6 @@ pub static mut Rope_Drawer: Event = None;
 
 use crate::game::GAME_STATE;
 
-unsafe extern "C" {
-    static mut minerWilly: MinerWilly;
-    static mut minerWillyRope: i32;
-}
-
 // Level constants
 const B_WILLY: i32 = 4;
 const R_ABOVE: i32 = 0;
@@ -204,16 +199,14 @@ fn do_rope_drawer() {
 
         // Check for Willy collision
         let pixel_val = video_get_pixel(&mut pixels, pos);
-        let willy_rope_zero = unsafe { minerWillyRope } == 0;
+        let willy_rope_zero = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) == 0;
         if willy_rope_zero && (pixel_val & B_WILLY) != 0 {
-            unsafe {
-                minerWillyRope = seg;
-            }
+            GAME_STATE.miner_willy_rope.store(seg, Ordering::Relaxed);
             ROPE.hold.store(1, Ordering::Relaxed);
         }
 
         // Handle Willy position if holding rope
-        let willy_on_rope = unsafe { minerWillyRope } == seg;
+        let willy_on_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) == seg;
         if willy_on_rope && ROPE.hold.load(Ordering::Relaxed) != 0 {
             let willy_x = x & 248;
             let willy_y = y - 8;
@@ -226,50 +219,49 @@ fn do_rope_drawer() {
                 if (x & 2) != 0 { 3 } else { 2 }
             };
 
-            unsafe {
-                minerWilly.x = if frame < 2 { willy_x } else { willy_x - 8 };
-                minerWilly.y = willy_y;
-                minerWilly.frame = frame;
-                minerWilly.tile = minerWilly.y / 8 * 32 + minerWilly.x / 8;
-                minerWilly.align = 4;
-            }
+            let mut miner = GAME_STATE.miner.lock().unwrap();
+            miner.x = if frame < 2 { willy_x } else { willy_x - 8 };
+            miner.y = willy_y;
+            miner.frame = frame;
+            miner.tile = miner.y / 8 * 32 + miner.x / 8;
+            miner.align = 4;
         }
 
         video_draw_rope_seg_inner(&mut pixels, pos, ink);
     }
 
     // Handle negative minerWillyRope
-    if unsafe { minerWillyRope } < 0 {
-        unsafe {
-            minerWillyRope += 1;
-        }
+    if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) < 0 {
+        GAME_STATE.miner_willy_rope.fetch_add(1, Ordering::Relaxed);
         ROPE.hold.store(0, Ordering::Relaxed);
         return;
     }
 
     // Handle rope movement when holding
     if ROPE.hold.load(Ordering::Relaxed) != 0 {
-        let willy_moving = unsafe { minerWilly.r#move } != 0;
+        let miner = GAME_STATE.miner.lock().unwrap();
+        let willy_moving = miner.move_ != 0;
+        drop(miner);
         if willy_moving {
             let dir = ROPE.dir.load(Ordering::Relaxed);
-            let willy_dir = unsafe { minerWilly.dir };
-            let seg = unsafe { minerWillyRope } + ROPE_MOVE[(dir ^ willy_dir) as usize];
+            let miner = GAME_STATE.miner.lock().unwrap();
+            let willy_dir = miner.dir;
+            drop(miner);
+            let current_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
+            let seg = current_rope + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
             let level_dir = unsafe { Level_Dir(R_ABOVE) };
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
-                unsafe {
-                    minerWillyRope = adjusted_seg;
-                }
+                GAME_STATE.miner_willy_rope.store(adjusted_seg, Ordering::Relaxed);
                 return;
             }
 
-            unsafe {
-                minerWillyRope = -16;
-                minerWilly.y &= 124;
-                minerWilly.air = 0;
-            }
+            let mut miner = GAME_STATE.miner.lock().unwrap();
+            GAME_STATE.miner_willy_rope.store(-16, Ordering::Relaxed);
+            miner.y &= 124;
+            miner.air = 0;
         }
     }
 }

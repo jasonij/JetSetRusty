@@ -17,7 +17,7 @@
 // still call them by that name.
 
 use crate::audio::{Audio_Sfx, audioPanX};
-use crate::common::{WIDTH, c_miner_willy};
+use crate::common::WIDTH;
 use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
 use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
 use std::sync::atomic::Ordering;
@@ -1256,16 +1256,15 @@ fn do_move_arrow_right(robot: &mut Robot) {
 }
 
 fn do_move_maria(robot: &mut Robot) {
-    // Maria reacts to Willy: reads the live C globals mid-frame (see the
-    // module header — no GAME_STATE, no sync).
-    unsafe {
-        if c_miner_willy.y < 96 && c_miner_willy.air == 0 {
-            robot.f_index = 3;
-        } else if c_miner_willy.y < 104 && c_miner_willy.air == 0 {
-            robot.f_index = 2;
-        } else {
-            robot.f_index = (GAME_STATE.clock_ticks.load(Ordering::Relaxed) & 2) >> 1;
-        }
+    // Maria reacts to Willy: reads GAME_STATE.miner directly (no sync needed
+    // as we're mid-frame inside an already-synced context).
+    let miner = GAME_STATE.miner.lock().unwrap();
+    if miner.y < 96 && miner.air == 0 {
+        robot.f_index = 3;
+    } else if miner.y < 104 && miner.air == 0 {
+        robot.f_index = 2;
+    } else {
+        robot.f_index = (GAME_STATE.clock_ticks.load(Ordering::Relaxed) & 2) >> 1;
     }
 }
 

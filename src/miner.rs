@@ -1,15 +1,11 @@
 // Port of miner.c — Willy (the miner): input handling, jump/fall/walk physics,
 // conveyor & ramp handling, collision, item pickup, and sprite rendering.
 //
-// This is a faithful, behaviour-preserving port. It still operates on the raw
-// `minerWilly` global (not GAME_STATE) exactly as the C did, because it runs
-// mid-frame inside DoGameTicker/do_game_drawer while the C globals are the live
-// source of truth (see the GAME_STATE sync model in CLAUDE.md). still-C
-// robots.c reads minerWilly.{y,air}, and levels.rs/die.rs/rope.rs/cheat.rs all
-// import `minerWilly`, so `minerWilly` / `minerWillyRope` remain #[no_mangle]
-// C-ABI globals defined here until robots.c is ported. `minerAttrSplit` and
-// `gameLevel` are owned by GAME_STATE (game.rs) — read via GAME_STATE here
-// rather than through a shared global.
+// This is a faithful, behaviour-preserving port. It now operates directly on
+// GAME_STATE.miner (the Rust-owned state) rather than a C-ABI global. The
+// minerWillyRope field lives in GAME_STATE.miner_willy_rope (atomic).
+// Other modules (robots.rs, levels.rs, die.rs, rope.rs, cheat.rs) read miner
+// state through GAME_STATE as well.
 
 use crate::audio::{Audio_WillySfx, audioPanX};
 use crate::common::Key;
@@ -102,17 +98,9 @@ const MINER_ZERO: Miner = Miner {
 };
 
 // File-static miner state (private; no C ABI needed).
-static mut MINER_STORE: Miner = MINER_ZERO;
 static mut MINER_FRAME: usize = 0; // base row into MINER_SPRITE (0 or 8)
 static mut MINER_SEQ_INDEX: u8 = 0;
 static mut MINER_TIMER: Timer = Timer { rate: 0, acc: 0, remainder: 0, divisor: 0 };
-
-// Shared globals (C ABI: robots.c / levels.rs / die.rs / rope.rs / cheat.rs).
-// C: `MINER minerWilly = {.frame = 0, .dir = D_RIGHT}` — all-zero (D_RIGHT == 0).
-#[unsafe(no_mangle)]
-pub static mut minerWilly: Miner = MINER_ZERO;
-#[unsafe(no_mangle)]
-pub static mut minerWillyRope: i32 = 0;
 
 // YALIGN macro from video.h.
 const fn yalign(y: i32) -> i32 {
@@ -142,316 +130,351 @@ pub extern "C" fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8) {
     }
 }
 
+// MINER_STORE is used for save/restore of miner state across room transitions.
+// It's file-static and doesn't need C ABI.
+static mut MINER_STORE: Miner = MINER_ZERO;
+
 #[unsafe(no_mangle)]
 pub extern "C" fn Miner_Restore() {
-    unsafe {
-        minerWilly.x = MINER_STORE.x;
-        minerWilly.y = MINER_STORE.y;
-        minerWilly.tile = MINER_STORE.tile;
-        minerWilly.align = MINER_STORE.align;
-        minerWilly.frame = MINER_STORE.frame;
-        minerWilly.dir = MINER_STORE.dir;
-        minerWilly.move_ = MINER_STORE.move_;
-        minerWilly.air = MINER_STORE.air;
-        minerWilly.jump = MINER_STORE.jump;
-    }
+    let mut miner = GAME_STATE.miner.lock().unwrap();
+    miner.x = unsafe { MINER_STORE.x };
+    miner.y = unsafe { MINER_STORE.y };
+    miner.tile = unsafe { MINER_STORE.tile };
+    miner.align = unsafe { MINER_STORE.align };
+    miner.frame = unsafe { MINER_STORE.frame };
+    miner.dir = unsafe { MINER_STORE.dir };
+    miner.move_ = unsafe { MINER_STORE.move_ };
+    miner.air = unsafe { MINER_STORE.air };
+    miner.jump = unsafe { MINER_STORE.jump };
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Miner_Save() {
+    let miner = GAME_STATE.miner.lock().unwrap();
     unsafe {
-        MINER_STORE.x = minerWilly.x;
-        MINER_STORE.y = minerWilly.y;
-        MINER_STORE.tile = minerWilly.tile;
-        MINER_STORE.align = minerWilly.align;
-        MINER_STORE.frame = minerWilly.frame;
-        MINER_STORE.dir = minerWilly.dir;
-        MINER_STORE.move_ = minerWilly.move_;
-        MINER_STORE.air = minerWilly.air;
-        MINER_STORE.jump = minerWilly.jump;
+        MINER_STORE.x = miner.x;
+        MINER_STORE.y = miner.y;
+        MINER_STORE.tile = miner.tile;
+        MINER_STORE.align = miner.align;
+        MINER_STORE.frame = miner.frame;
+        MINER_STORE.dir = miner.dir;
+        MINER_STORE.move_ = miner.move_;
+        MINER_STORE.air = miner.air;
+        MINER_STORE.jump = miner.jump;
+    }
 
+    unsafe {
         MINER_FRAME = if GAME_STATE.level.load(Ordering::Relaxed) == NIGHTMAREROOM { 8 } else { 0 };
     }
 }
 
-fn is_solid(tile: i32) -> bool {
-    unsafe {
-        if tile < 0 || tile == 512 {
-            return false;
-        }
-
-        if Level_GetTileType(tile as usize) == TileType::Solid {
-            return true;
-        }
-
-        if Level_GetTileType((tile + 32) as usize) == TileType::Solid {
-            return true;
-        }
-
-        if tile + 64 > 511 {
-            return false;
-        }
-
-        if Level_GetTileType((tile + 64) as usize) != TileType::Solid {
-            return false;
-        }
-
-        if minerWilly.align == 6 {
-            return true;
-        }
-
-        if minerWilly.air == 1 && minerWilly.jump > 9 {
-            minerWilly.air = 0;
-        }
-
-        false
+fn is_solid(tile: i32, miner: &mut Miner) -> bool {
+    if tile < 0 || tile == 512 {
+        return false;
     }
+
+    if unsafe { Level_GetTileType(tile as usize) } == TileType::Solid {
+        return true;
+    }
+
+    if unsafe { Level_GetTileType((tile + 32) as usize) } == TileType::Solid {
+        return true;
+    }
+
+    if tile + 64 > 511 {
+        return false;
+    }
+
+    if unsafe { Level_GetTileType((tile + 64) as usize) } != TileType::Solid {
+        return false;
+    }
+
+    if miner.align == 6 {
+        return true;
+    }
+
+    if miner.air == 1 && miner.jump > 9 {
+        miner.air = 0;
+    }
+
+    false
 }
 
 fn move_left_right() {
-    unsafe {
-        let mut y = 0;
-        let mut offset = 0;
+    let mut miner = GAME_STATE.miner.lock().unwrap();
+    
+    if miner.move_ == 0 {
+        return;
+    }
 
-        if minerWilly.move_ == 0 {
+    if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) > 0 {
+        return;
+    }
+
+    if miner.dir == D_RIGHT {
+        if miner.frame < 3 {
+            miner.frame += 1;
             return;
         }
 
-        if minerWillyRope > 0 {
+        if miner.air == 0 {
+            if unsafe { Level_GetTileRamp((miner.tile + 64) as usize) } == TileType::RampL {
+                let y = 8;
+                let offset = 32;
+                if is_solid(miner.tile + offset + 2, &mut miner) {
+                    return;
+                }
+                miner.y += y;
+                miner.tile += offset;
+                return;
+            } else if unsafe { Level_GetTileRamp((miner.tile + 34) as usize) } == TileType::RampR {
+                let y = -8;
+                let offset = -32;
+                if is_solid(miner.tile + offset + 2, &mut miner) {
+                    return;
+                }
+                miner.y += y;
+                miner.tile += offset;
+                return;
+            }
+        }
+
+        if miner.x == 30 * 8 {
+            drop(miner);
+            Game_ChangeLevel(Direction::Right as i32);
             return;
         }
 
-        if minerWilly.dir == D_RIGHT {
-            if minerWilly.frame < 3 {
-                minerWilly.frame += 1;
-                return;
-            }
-
-            if minerWilly.air == 0 {
-                if Level_GetTileRamp((minerWilly.tile + 64) as usize) == TileType::RampL {
-                    y = 8;
-                    offset = 32;
-                } else if Level_GetTileRamp((minerWilly.tile + 34) as usize) == TileType::RampR {
-                    y = -8;
-                    offset = -32;
-                }
-            }
-
-            if minerWilly.x == 30 * 8 {
-                Game_ChangeLevel(Direction::Right as i32);
-                return;
-            }
-
-            if is_solid(minerWilly.tile + offset + 2) {
-                return;
-            }
-
-            minerWilly.x += 8;
-            minerWilly.tile += 1;
-            minerWilly.frame = 0;
-        } else if GAME_STATE.mode.load(Ordering::Relaxed) != GameMode::Running as u8 {
-            if minerWilly.frame > 0 {
-                minerWilly.frame -= 1;
-                return;
-            }
-
-            if minerWilly.air == 0 {
-                if Level_GetTileRamp((minerWilly.tile + 31) as usize) == TileType::RampL {
-                    y = -8;
-                    offset = -32;
-                } else if Level_GetTileRamp((minerWilly.tile + 65) as usize) == TileType::RampR {
-                    y = 8;
-                    offset = 32;
-                }
-            }
-
-            if minerWilly.x == 0 {
-                Game_ChangeLevel(Direction::Left as i32);
-                return;
-            }
-
-            if is_solid(minerWilly.tile + offset - 1) {
-                return;
-            }
-
-            minerWilly.x -= 8;
-            minerWilly.tile -= 1;
-            minerWilly.frame = 3;
+        if is_solid(miner.tile + 2, &mut miner) {
+            return;
         }
 
-        minerWilly.y += y;
-        minerWilly.tile += offset;
+        miner.x += 8;
+        miner.tile += 1;
+        miner.frame = 0;
+    } else if GAME_STATE.mode.load(Ordering::Relaxed) != GameMode::Running as u8 {
+        if miner.frame > 0 {
+            miner.frame -= 1;
+            return;
+        }
+
+        if miner.air == 0 {
+            if unsafe { Level_GetTileRamp((miner.tile + 31) as usize) } == TileType::RampL {
+                let y = -8;
+                let offset = -32;
+                if is_solid(miner.tile + offset - 1, &mut miner) {
+                    return;
+                }
+                miner.y += y;
+                miner.tile += offset;
+                return;
+            } else if unsafe { Level_GetTileRamp((miner.tile + 65) as usize) } == TileType::RampR {
+                let y = 8;
+                let offset = 32;
+                if is_solid(miner.tile + offset - 1, &mut miner) {
+                    return;
+                }
+                miner.y += y;
+                miner.tile += offset;
+                return;
+            }
+        }
+
+        if miner.x == 0 {
+            drop(miner);
+            Game_ChangeLevel(Direction::Left as i32);
+            return;
+        }
+
+        if is_solid(miner.tile - 1, &mut miner) {
+            return;
+        }
+
+        miner.x -= 8;
+        miner.tile -= 1;
+        miner.frame = 3;
     }
 }
 
 fn update_dir(convey_dir: i32) {
-    unsafe {
-        let mut dir = 0;
+    let mut miner = GAME_STATE.miner.lock().unwrap();
+    let mut dir = 0;
 
-        if (System_IsKey(Key::Left as i32) != 0 || convey_dir == C_LEFT)
-            && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
-        {
-            dir += 1;
+    if (System_IsKey(Key::Left as i32) != 0 || convey_dir == C_LEFT)
+        && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
+    {
+        dir += 1;
+    }
+
+    if System_IsKey(Key::Right as i32) != 0
+        || convey_dir == C_RIGHT
+        || GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Running as u8
+    {
+        dir += 2;
+    }
+
+    if dir == 0 {
+        miner.move_ = 0;
+    } else if dir == 1 {
+        if miner.dir == D_RIGHT {
+            miner.dir = D_LEFT;
+            miner.move_ = 0;
+        } else {
+            miner.move_ = 1;
         }
-
-        if System_IsKey(Key::Right as i32) != 0
-            || convey_dir == C_RIGHT
-            || GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Running as u8
-        {
-            dir += 2;
+    } else if dir == 2 {
+        if miner.dir == D_LEFT {
+            miner.dir = D_RIGHT;
+            miner.move_ = 0;
+        } else {
+            miner.move_ = 1;
         }
+    }
 
-        if dir == 0 {
-            minerWilly.move_ = 0;
-        } else if dir == 1 {
-            if minerWilly.dir == D_RIGHT {
-                minerWilly.dir = D_LEFT;
-                minerWilly.move_ = 0;
-            } else {
-                minerWilly.move_ = 1;
-            }
-        } else if dir == 2 {
-            if minerWilly.dir == D_LEFT {
-                minerWilly.dir = D_RIGHT;
-                minerWilly.move_ = 0;
-            } else {
-                minerWilly.move_ = 1;
-            }
-        }
-
-        if System_IsKey(Key::Jump as i32) != 0 && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8 {
-            minerWilly.air = 1;
-            minerWilly.jump = 0;
-            if minerWillyRope > 0 {
-                minerWillyRope = -16;
-                minerWilly.y &= 120;
-                minerWilly.align = 4;
-                minerWilly.move_ = 1;
-            }
+    if System_IsKey(Key::Jump as i32) != 0 && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8 {
+        miner.air = 1;
+        miner.jump = 0;
+        if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) > 0 {
+            GAME_STATE.miner_willy_rope.store(-16, Ordering::Relaxed);
+            miner.y &= 120;
+            miner.align = 4;
+            miner.move_ = 1;
         }
     }
 }
 
 fn do_miner_ticker() {
-    unsafe {
-        let mut convey_dir = C_NONE;
+    let mut miner = GAME_STATE.miner.lock().unwrap();
+    let mut convey_dir = C_NONE;
 
-        if minerWillyRope > 0 {
-            update_dir(convey_dir);
+    if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) > 0 {
+        drop(miner);
+        update_dir(convey_dir);
+        return;
+    }
+
+    if miner.air == 1 {
+        let jump_info = JUMP_INFO[miner.jump as usize];
+        let y = miner.y + jump_info.jump;
+
+        if y < 0 {
+            drop(miner);
+            Game_ChangeLevel(Direction::Above as i32);
             return;
         }
 
-        if minerWilly.air == 1 {
-            let y = minerWilly.y + JUMP_INFO[minerWilly.jump as usize].jump;
+        let tile = miner.tile + jump_info.tile;
+        if unsafe { Level_GetTileType(tile as usize) } == TileType::Solid
+            || unsafe { Level_GetTileType((tile + 1) as usize) } == TileType::Solid
+        {
+            // we need to re-align Willy
+            miner.y = (y + 8) & 120;
+            miner.tile = tile + 32;
+            miner.align = 4;
 
-            if y < 0 {
-                Game_ChangeLevel(Direction::Above as i32);
-                return;
-            }
-
-            let tile = minerWilly.tile + JUMP_INFO[minerWilly.jump as usize].tile;
-            if Level_GetTileType(tile as usize) == TileType::Solid
-                || Level_GetTileType((tile + 1) as usize) == TileType::Solid
-            {
-                // we need to re-align Willy
-                minerWilly.y = (y + 8) & 120;
-                minerWilly.tile = tile + 32;
-                minerWilly.align = 4;
-
-                minerWilly.air = 2;
-                minerWilly.move_ = 0;
-                return;
-            }
-
-            audioPanX = minerWilly.x;
-            Audio_WillySfx(
-                JUMP_INFO[minerWilly.jump as usize].pitch,
-                JUMP_INFO[minerWilly.jump as usize].length,
-            );
-
-            minerWilly.y = y;
-            minerWilly.tile = tile;
-            minerWilly.align = JUMP_INFO[minerWilly.jump as usize].align;
-            minerWilly.jump += 1;
-
-            if minerWilly.jump == 18 {
-                minerWilly.air = 6;
-                return;
-            }
-
-            if minerWilly.jump != 13 && minerWilly.jump != 16 {
-                move_left_right();
-                return;
-            }
+            miner.air = 2;
+            miner.move_ = 0;
+            return;
         }
 
-        if minerWilly.align == 4 {
-            let tile = minerWilly.tile + 64;
-            if tile & 512 != 0 {
-                Game_ChangeLevel(Direction::Below as i32);
-                return;
-            }
+        unsafe {
+            audioPanX = miner.x;
+        }
+        Audio_WillySfx(jump_info.pitch, jump_info.length);
 
-            let type0 = Level_GetTileType(tile as usize);
-            let type1 = Level_GetTileType((tile + 1) as usize);
-            if type0 == TileType::Harm || type1 == TileType::Harm {
-                if minerWilly.air == 1
-                    && (type0 as i32 <= TileType::Space as i32
-                        || type1 as i32 <= TileType::Space as i32)
-                {
-                    move_left_right();
-                } else {
-                    Action = Some(Die_Action);
-                }
-                return;
-            }
+        miner.y = y;
+        miner.tile = tile;
+        miner.align = jump_info.align;
+        miner.jump += 1;
 
-            if type0 as i32 > TileType::Space as i32 || type1 as i32 > TileType::Space as i32 {
-                if minerWilly.air >= 12 {
-                    Action = Some(Die_Action);
-                    return;
-                }
-
-                minerWilly.air = 0;
-
-                if type0 == TileType::ConveyL || type1 == TileType::ConveyL {
-                    convey_dir = C_LEFT;
-                } else if type0 == TileType::ConveyR || type1 == TileType::ConveyR {
-                    convey_dir = C_RIGHT;
-                }
-
-                update_dir(convey_dir);
-                move_left_right();
-                return;
-            }
+        if miner.jump == 18 {
+            miner.air = 6;
+            return;
         }
 
-        if minerWilly.air == 1 {
+        if miner.jump != 13 && miner.jump != 16 {
+            drop(miner);
             move_left_right();
             return;
         }
+    }
 
-        minerWilly.move_ = 0;
-        if minerWilly.air == 0 {
-            minerWilly.air = 2;
+    if miner.align == 4 {
+        let tile = miner.tile + 64;
+        if tile & 512 != 0 {
+            drop(miner);
+            Game_ChangeLevel(Direction::Below as i32);
             return;
         }
 
-        minerWilly.air += 1;
-        if minerWilly.air == 16 {
-            // this affects the falling sound effect
-            minerWilly.air = 12;
+        let type0 = unsafe { Level_GetTileType(tile as usize) };
+        let type1 = unsafe { Level_GetTileType((tile + 1) as usize) };
+        if type0 == TileType::Harm || type1 == TileType::Harm {
+            if miner.air == 1
+                && (type0 as i32 <= TileType::Space as i32
+                    || type1 as i32 <= TileType::Space as i32)
+            {
+                drop(miner);
+                move_left_right();
+            } else {
+                unsafe {
+                    Action = Some(Die_Action);
+                }
+            }
+            return;
         }
 
-        audioPanX = minerWilly.x;
-        Audio_WillySfx(78 - minerWilly.air, 4);
-        minerWilly.y += 4;
-        minerWilly.align = 4;
-        if minerWilly.y & 7 != 0 {
-            minerWilly.align += 2;
-        } else {
-            minerWilly.tile += 32;
+        if type0 as i32 > TileType::Space as i32 || type1 as i32 > TileType::Space as i32 {
+            if miner.air >= 12 {
+                unsafe {
+                    Action = Some(Die_Action);
+                }
+                return;
+            }
+
+            miner.air = 0;
+
+            if type0 == TileType::ConveyL || type1 == TileType::ConveyL {
+                convey_dir = C_LEFT;
+            } else if type0 == TileType::ConveyR || type1 == TileType::ConveyR {
+                convey_dir = C_RIGHT;
+            }
+
+            drop(miner);
+            update_dir(convey_dir);
+            move_left_right();
+            return;
         }
+    }
+
+    if miner.air == 1 {
+        drop(miner);
+        move_left_right();
+        return;
+    }
+
+    miner.move_ = 0;
+    if miner.air == 0 {
+        miner.air = 2;
+        return;
+    }
+
+    miner.air += 1;
+    if miner.air == 16 {
+        // this affects the falling sound effect
+        miner.air = 12;
+    }
+
+    unsafe {
+        audioPanX = miner.x;
+    }
+    Audio_WillySfx(78 - miner.air, 4);
+    miner.y += 4;
+    miner.align = 4;
+    if miner.y & 7 != 0 {
+        miner.align += 2;
+    } else {
+        miner.tile += 32;
     }
 }
 
@@ -459,74 +482,77 @@ fn do_miner_ticker() {
 pub extern "C" fn Miner_Ticker() {
     do_miner_ticker();
 
-    unsafe {
-        if minerWilly.y < 0 {
-            Game_ChangeLevel(Direction::Above as i32);
-        }
+    let miner = GAME_STATE.miner.lock().unwrap();
+    if miner.y < 0 {
+        drop(miner);
+        Game_ChangeLevel(Direction::Above as i32);
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Miner_Drawer() {
-    unsafe {
-        let mut offset = 0;
-        let mut align = minerWilly.align;
+    let miner = GAME_STATE.miner.lock().unwrap();
+    let mut offset = 0;
+    let mut align = miner.align;
 
-        if minerWilly.air == 0 {
-            if Level_GetTileRamp((minerWilly.tile + 64) as usize) == TileType::RampL {
-                offset = minerWilly.frame << 1;
-                align = yalign(offset);
-            } else if Level_GetTileRamp((minerWilly.tile + 65) as usize) == TileType::RampR {
-                offset = 6 - (minerWilly.frame << 1);
-                align = yalign(offset);
-            }
+    if miner.air == 0 {
+        if unsafe { Level_GetTileRamp((miner.tile + 64) as usize) } == TileType::RampL {
+            offset = miner.frame << 1;
+            align = yalign(offset);
+        } else if unsafe { Level_GetTileRamp((miner.tile + 65) as usize) } == TileType::RampR {
+            offset = 6 - (miner.frame << 1);
+            align = yalign(offset);
         }
+    }
 
-        let row = MINER_FRAME + ((minerWilly.dir << 2) | minerWilly.frame) as usize;
-        if Video_DrawMiner(
-            ((minerWilly.y + offset) << 8) | minerWilly.x,
-            MINER_SPRITE[row].as_ptr(),
-            GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
-        ) != 0
-        {
+    let row = unsafe { MINER_FRAME } + ((miner.dir << 2) | miner.frame) as usize;
+    if Video_DrawMiner(
+        ((miner.y + offset) << 8) | miner.x,
+        MINER_SPRITE[row].as_ptr(),
+        GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
+    ) != 0
+    {
+        unsafe {
             Action = Some(Die_Action);
+        }
+        return;
+    }
+
+    let mut tile = miner.tile;
+    let mut adj = 1;
+    for _ in 0..align {
+        if unsafe { Level_GetTileType(tile as usize) } == TileType::Harm {
+            unsafe {
+                Action = Some(Die_Action);
+            }
             return;
         }
+        tile += adj;
+        adj ^= 30;
+    }
 
-        let mut tile = minerWilly.tile;
-        let mut adj = 1;
-        for _ in 0..align {
-            if Level_GetTileType(tile as usize) == TileType::Harm {
-                Action = Some(Die_Action);
-                return;
-            }
-            tile += adj;
-            adj ^= 30;
+    let mut tile = miner.tile;
+    let mut adj = 1;
+    for _ in 0..align {
+        if unsafe { Level_GetTileType(tile as usize) } == TileType::Item {
+            Level_EraseItem(tile as usize);
+            Game_GotItem();
         }
-
-        let mut tile = minerWilly.tile;
-        let mut adj = 1;
-        for _ in 0..align {
-            if Level_GetTileType(tile as usize) == TileType::Item {
-                Level_EraseItem(tile as usize);
-                Game_GotItem();
-            }
-            tile += adj;
-            adj ^= 30;
-        }
+        tile += adj;
+        adj ^= 30;
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Miner_Init() {
-    unsafe {
-        minerWilly.x = 20 * 8;
-        minerWilly.y = 13 * 8;
-        minerWilly.tile = 13 * 32 + 20;
-        minerWilly.align = 4;
-        minerWilly.move_ = 0;
-        minerWilly.air = 0;
-    }
+    let mut miner = GAME_STATE.miner.lock().unwrap();
+    miner.x = 20 * 8;
+    miner.y = 13 * 8;
+    miner.tile = 13 * 32 + 20;
+    miner.align = 4;
+    miner.move_ = 0;
+    miner.air = 0;
+    drop(miner);
 
     Miner_Save();
 }

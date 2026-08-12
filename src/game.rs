@@ -12,19 +12,15 @@ use crate::video::{
 
 use crate::cheat::cheatEnabled;
 use crate::common::{
-    // C globals still shared with non-game.rs modules via their own extern
-    // blocks, so GAME_STATE still syncs them: the miner pair (minerWilly/minerWillyRope).
-    // Everything else has been dissolved into GAME_STATE — most recently
-    // gameMode, gameLevel, miner_attr_split, clock_ticks (robots), game_paused & item_count (title),
+    // All C-ABI globals have been dissolved into GAME_STATE.
+    // Everything has been dissolved: gameMode, gameLevel, minerWilly, minerWillyRope,
+    // miner_attr_split, clock_ticks (robots), game_paused & item_count (title),
     // and lives (die).
-    c_miner_willy,
-    c_miner_willy_rope,
     // Types
     Event,
     Key,
     // C functions
     Level_SetBorder,
-    MinerWilly,
 
     // Constant(s)
     WIDTH,
@@ -656,15 +652,10 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
         // miner guard dropped here at end of scope
     }
 
-    // game_init_room() reads the raw C globals — level_init / Robots_Init /
-    // Miner_Save all use gameLevel / minerWilly directly — and it re-syncs
-    // C->shadow on entry. Push our shadow changes (the new gameLevel and the
-    // repositioned Willy) out to C *first*, or game_init_room's entry
-    // sync_c_to_rust reloads the stale old level and re-inits the CURRENT room
-    // instead of the new one. That was the "can't leave the room" bug — a nested
-    // sync-bracket trap (see the memory of the same name). game_init_room's own
-    // exit sync leaves C/shadow consistent, so no trailing sync is needed here.
-    sync_rust_to_c();
+    // game_init_room() reads GAME_STATE directly now — level_init / Robots_Init /
+    // Miner_Save all use GAME_STATE. No sync needed since everything is now
+    // in GAME_STATE. The old "can't leave the room" bug (nested sync-bracket trap)
+    // is resolved.
     game_init_room();
 }
 
@@ -736,14 +727,8 @@ pub extern "C" fn DoGameTicker() {
     // Tick miner
     unsafe {
         Miner_Ticker();
-        // Miner_Ticker reads live key state and mutates the C-owned minerWilly
-        // (movement/jump). Refresh the shadow from C now, or the GM_RUNNING /
-        // GM_MARIA reads below — and the exit sync_rust_to_c() — would write the
-        // stale pre-physics miner back over Willy's movement (the "Willy won't
-        // respond to input" bug). minerWilly is the only miner state that the
-        // sync round-trips, so a targeted pull is enough; a full sync_c_to_rust
-        // here would revert this frame's gate/mode work.
-        *GAME_STATE.miner.lock().unwrap() = c_miner_willy;
+        // Miner_Ticker now writes directly to GAME_STATE.miner, so no sync
+        // copy is needed here.
     }
 
     // GM_RUNNING mode
@@ -955,10 +940,7 @@ fn sync_rust_to_c() {
     unsafe {
         // Atomic fields -> C globals
         cheatEnabled = GAME_STATE.cheat_enabled.load(Ordering::Relaxed) as i32;
-        c_miner_willy_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
-
-        // Mutex fields -> C globals
-        c_miner_willy = *GAME_STATE.miner.lock().unwrap();
+        // All other globals have been dissolved into GAME_STATE
     }
 }
 
@@ -968,12 +950,7 @@ fn sync_c_to_rust() {
         GAME_STATE
             .cheat_enabled
             .store(cheatEnabled != 0, Ordering::Relaxed);
-        GAME_STATE
-            .miner_willy_rope
-            .store(c_miner_willy_rope, Ordering::Relaxed);
-
-        // C globals -> Mutex fields
-        *GAME_STATE.miner.lock().unwrap() = c_miner_willy;
+        // All other globals have been dissolved into GAME_STATE
     }
 }
 
