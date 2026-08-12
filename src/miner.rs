@@ -12,7 +12,7 @@
 // rather than through a shared global.
 
 use crate::audio::{Audio_WillySfx, audioPanX};
-use crate::common::{Key, c_game_mode};
+use crate::common::Key;
 use crate::die::Die_Action;
 use crate::game::{
     Direction, GAME_STATE, GameMode, Game_ChangeLevel, Game_GotItem, Miner, NIGHTMAREROOM,
@@ -249,7 +249,7 @@ fn move_left_right() {
             minerWilly.x += 8;
             minerWilly.tile += 1;
             minerWilly.frame = 0;
-        } else if c_game_mode != GameMode::Running as i32 {
+        } else if GAME_STATE.mode.load(Ordering::Relaxed) != GameMode::Running as u8 {
             if minerWilly.frame > 0 {
                 minerWilly.frame -= 1;
                 return;
@@ -289,14 +289,14 @@ fn update_dir(convey_dir: i32) {
         let mut dir = 0;
 
         if (System_IsKey(Key::Left as i32) != 0 || convey_dir == C_LEFT)
-            && c_game_mode < GameMode::Running as i32
+            && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
         {
             dir += 1;
         }
 
         if System_IsKey(Key::Right as i32) != 0
             || convey_dir == C_RIGHT
-            || c_game_mode == GameMode::Running as i32
+            || GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Running as u8
         {
             dir += 2;
         }
@@ -319,7 +319,7 @@ fn update_dir(convey_dir: i32) {
             }
         }
 
-        if System_IsKey(Key::Jump as i32) != 0 && c_game_mode < GameMode::Running as i32 {
+        if System_IsKey(Key::Jump as i32) != 0 && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8 {
             minerWilly.air = 1;
             minerWilly.jump = 0;
             if minerWillyRope > 0 {

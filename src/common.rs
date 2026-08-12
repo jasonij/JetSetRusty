@@ -102,22 +102,18 @@ pub fn system_set_pixel(pos: i32, ink: i32) {
     System_SetPixel(pos, ink)
 }
 
-// These `c_*` bindings alias the shared C-ABI globals (defined in cglobals.rs /
-// miner.rs) via `#[link_name]`, so the `GAME_STATE` mirror and the modules that
-// still read/write the raw globals directly (title/cheat/die/rope/levels/miner/
-// robots) hit the same storage. `gameMode` is `int` in the raw global — keep it
-// i32 here so we write the full word, and cast at the AtomicU8 boundary in
-// game.rs. `cheatEnabled` is deliberately absent: it is Rust-owned (cheat.rs)
+// These `c_*` bindings alias the shared C-ABI globals (defined in miner.rs)
+// via `#[link_name]`, so the `GAME_STATE` mirror and the modules that
+// still read/write the raw globals directly (miner/robots) hit the same storage.
+// `cheatEnabled` is deliberately absent: it is Rust-owned (cheat.rs)
 // and already a single shared symbol.
 //
 // Only globals with a reader outside game.rs remain here; the rest have been
 // dissolved into GAME_STATE (music/frame/inactivity_timer/level_border/
 // score_clock/score_items/timer, then clock_ticks/game_paused/item_count/lives,
-// then miner_attr_split, then gameLevel).
+// then miner_attr_split, then gameLevel, then gameMode).
 unsafe extern "C" {
     // Game state
-    #[link_name = "gameMode"]
-    pub static mut c_game_mode: i32;
     #[link_name = "minerWillyRope"]
     pub static mut c_miner_willy_rope: i32;
 

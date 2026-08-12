@@ -7,6 +7,8 @@ use crate::video::{tile_2_pixel, video_pixel_fill};
 use std::ptr::addr_of_mut;
 use std::sync::atomic::Ordering;
 
+use crate::game::GameMode;
+
 unsafe extern "C" {
     fn Game_GameReset();
     fn Game_DrawStatus();
@@ -18,12 +20,10 @@ unsafe extern "C" {
     fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
     fn DoQuit();
     fn DoNothing();
-    static mut gameMode: i32;
 }
 
 const MUS_TITLE: i32 = 0;
 const THEBATHROOM: i32 = 33;
-const GM_NORMAL: i32 = 0;
 
 static TITLE_JSW: [i32; 100] = [
     100, 101, 102, 104, 105, 106, 108, 109, 110, 113, 114, 115, 117, 118, 119, 121, 122, 123, 133,
@@ -65,7 +65,7 @@ unsafe extern "C" fn game_start() {
             Robots_DrawCheat();
         }
 
-        gameMode = GM_NORMAL;
+        GAME_STATE.mode.store(GameMode::Normal as u8, Ordering::Relaxed);
         GAME_STATE.game_paused.store(0, Ordering::Relaxed);
 
         Game_Action();

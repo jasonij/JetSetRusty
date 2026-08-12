@@ -3,12 +3,12 @@
 //
 // This is a faithful, behaviour-preserving port. Like miner.rs, it runs
 // mid-frame inside DoGameTicker/do_game_drawer. For the shared C-ABI globals it
-// still needs (`minerWilly.{y,air}`, `gameMode`) it reads the raw
+// still needs (`minerWilly.{y,air}`) it reads the raw
 // storage straight through the `c_*` link_name aliases in common.rs, rather
 // than locking GAME_STATE's mutex fields mid-frame and nesting sync brackets
 // inside the already-synced game.rs callers (the documented anti-pattern).
-// `clock_ticks` and `gameLevel`, now dissolved into GAME_STATE, are read via
-// plain atomic loads — no mutex, no sync, so no nesting risk.
+// `clock_ticks`, `gameLevel`, and `gameMode`, now dissolved into GAME_STATE, are
+// read via plain atomic loads — no mutex, no sync, so no nesting risk.
 //
 // Robot state (C `robotThis[8]` and the `curRobot` cursor) was file-static in
 // robots.c and nothing else referenced it, so after this port it is
@@ -17,7 +17,7 @@
 // still call them by that name.
 
 use crate::audio::{Audio_Sfx, audioPanX};
-use crate::common::{WIDTH, c_game_mode, c_miner_willy};
+use crate::common::{WIDTH, c_miner_willy};
 use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
 use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
 use std::sync::atomic::Ordering;
@@ -1326,7 +1326,8 @@ pub extern "C" fn Robots_Init() {
 
         // Once Maria has been dealt with, the Master Bedroom robots (her two
         // colour layers) are gone.
-        if GAME_STATE.level.load(Ordering::Relaxed) == MASTERBEDROOM && c_game_mode == GameMode::Maria as i32 {
+        if GAME_STATE.level.load(Ordering::Relaxed) == MASTERBEDROOM 
+            && GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Maria as u8 {
             for robot in &mut robots[..2] {
                 robot.do_move = do_move_nothing;
                 robot.do_draw = do_draw_nothing;
