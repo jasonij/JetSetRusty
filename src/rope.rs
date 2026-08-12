@@ -164,8 +164,9 @@ pub static mut Rope_Drawer: Event = None;
 // Extern declarations - the real C globals shared with levels.rs and the C code
 // ----------------------------------------------------------------------------
 
+use crate::game::GAME_STATE;
+
 unsafe extern "C" {
-    static gameLevel: i32;
     static mut minerWilly: MinerWilly;
     static mut minerWillyRope: i32;
 }
@@ -298,7 +299,7 @@ unsafe extern "C" fn rope_drawer_fn() {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Rope_Init() {
-    let level = unsafe { gameLevel };
+    let level = GAME_STATE.level.load(Ordering::Relaxed);
     let (x, ink) = match level {
         QUIRKAFLEEG => (16, 6),
         ONTHEROOF => (16, 4),

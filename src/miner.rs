@@ -7,12 +7,12 @@
 // source of truth (see the GAME_STATE sync model in CLAUDE.md). still-C
 // robots.c reads minerWilly.{y,air}, and levels.rs/die.rs/rope.rs/cheat.rs all
 // import `minerWilly`, so `minerWilly` / `minerWillyRope` remain #[no_mangle]
-// C-ABI globals defined here until robots.c is ported. `minerAttrSplit` is
-// owned by GAME_STATE.miner_attr_split (game.rs) — read via GAME_STATE here
+// C-ABI globals defined here until robots.c is ported. `minerAttrSplit` and
+// `gameLevel` are owned by GAME_STATE (game.rs) — read via GAME_STATE here
 // rather than through a shared global.
 
 use crate::audio::{Audio_WillySfx, audioPanX};
-use crate::common::{Key, c_game_level, c_game_mode};
+use crate::common::{Key, c_game_mode};
 use crate::die::Die_Action;
 use crate::game::{
     Direction, GAME_STATE, GameMode, Game_ChangeLevel, Game_GotItem, Miner, NIGHTMAREROOM,
@@ -170,7 +170,7 @@ pub extern "C" fn Miner_Save() {
         MINER_STORE.air = minerWilly.air;
         MINER_STORE.jump = minerWilly.jump;
 
-        MINER_FRAME = if c_game_level == NIGHTMAREROOM { 8 } else { 0 };
+        MINER_FRAME = if GAME_STATE.level.load(Ordering::Relaxed) == NIGHTMAREROOM { 8 } else { 0 };
     }
 }
 

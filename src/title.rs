@@ -18,7 +18,6 @@ unsafe extern "C" {
     fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
     fn DoQuit();
     fn DoNothing();
-    static mut gameLevel: i32;
     static mut gameMode: i32;
 }
 
@@ -54,7 +53,7 @@ unsafe extern "C" fn game_start() {
         Game_GameReset();
         Game_DrawStatus();
 
-        gameLevel = THEBATHROOM;
+        GAME_STATE.level.store(THEBATHROOM, Ordering::Relaxed);
         GAME_STATE
             .item_count
             .store(Level_ItemCount(), Ordering::Relaxed);

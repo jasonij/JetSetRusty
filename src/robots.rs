@@ -3,12 +3,12 @@
 //
 // This is a faithful, behaviour-preserving port. Like miner.rs, it runs
 // mid-frame inside DoGameTicker/do_game_drawer. For the shared C-ABI globals it
-// still needs (`minerWilly.{y,air}`, `gameLevel`, `gameMode`) it reads the raw
+// still needs (`minerWilly.{y,air}`, `gameMode`) it reads the raw
 // storage straight through the `c_*` link_name aliases in common.rs, rather
 // than locking GAME_STATE's mutex fields mid-frame and nesting sync brackets
 // inside the already-synced game.rs callers (the documented anti-pattern).
-// `clock_ticks`, now dissolved into GAME_STATE, is read via a plain atomic load
-// — no mutex, no sync, so no nesting risk.
+// `clock_ticks` and `gameLevel`, now dissolved into GAME_STATE, are read via
+// plain atomic loads — no mutex, no sync, so no nesting risk.
 //
 // Robot state (C `robotThis[8]` and the `curRobot` cursor) was file-static in
 // robots.c and nothing else referenced it, so after this port it is
@@ -17,7 +17,7 @@
 // still call them by that name.
 
 use crate::audio::{Audio_Sfx, audioPanX};
-use crate::common::{WIDTH, c_game_level, c_game_mode, c_miner_willy};
+use crate::common::{WIDTH, c_game_mode, c_miner_willy};
 use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
 use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
 use std::sync::atomic::Ordering;
@@ -1322,11 +1322,11 @@ pub extern "C" fn Robots_Drawer() {
 pub extern "C" fn Robots_Init() {
     unsafe {
         let robots = &mut *(&raw mut ROBOT_THIS);
-        *robots = ROBOT_START[c_game_level as usize];
+        *robots = ROBOT_START[GAME_STATE.level.load(Ordering::Relaxed) as usize];
 
         // Once Maria has been dealt with, the Master Bedroom robots (her two
         // colour layers) are gone.
-        if c_game_level == MASTERBEDROOM && c_game_mode == GameMode::Maria as i32 {
+        if GAME_STATE.level.load(Ordering::Relaxed) == MASTERBEDROOM && c_game_mode == GameMode::Maria as i32 {
             for robot in &mut robots[..2] {
                 robot.do_move = do_move_nothing;
                 robot.do_draw = do_draw_nothing;

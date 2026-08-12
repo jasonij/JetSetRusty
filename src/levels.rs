@@ -1,9 +1,10 @@
 use crate::common::{MinerWilly, WIDTH, videoFlash};
+use crate::game::GAME_STATE;
 use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
+use std::sync::atomic::Ordering;
 
 unsafe extern "C" {
     fn System_Border(colour_index: i32); // We'll honour the pondish spelling
-    static gameLevel: i32;
     static mut minerWilly: MinerWilly;
 }
 
@@ -4958,7 +4959,7 @@ pub fn level_set_border() {
 }
 
 fn game_level() -> usize {
-    unsafe { gameLevel as usize }
+    GAME_STATE.level.load(Ordering::Relaxed) as usize
 }
 
 #[unsafe(no_mangle)]
