@@ -205,6 +205,8 @@ fn is_solid(tile: i32, miner: &mut Miner) -> bool {
 
 fn move_left_right() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
+    let mut y = 0;
+    let mut offset = 0;
     
     if miner.move_ == 0 {
         return;
@@ -222,23 +224,11 @@ fn move_left_right() {
 
         if miner.air == 0 {
             if unsafe { Level_GetTileRamp((miner.tile + 64) as usize) } == TileType::RampL {
-                let y = 8;
-                let offset = 32;
-                if is_solid(miner.tile + offset + 2, &mut miner) {
-                    return;
-                }
-                miner.y += y;
-                miner.tile += offset;
-                return;
+                y = 8;
+                offset = 32;
             } else if unsafe { Level_GetTileRamp((miner.tile + 34) as usize) } == TileType::RampR {
-                let y = -8;
-                let offset = -32;
-                if is_solid(miner.tile + offset + 2, &mut miner) {
-                    return;
-                }
-                miner.y += y;
-                miner.tile += offset;
-                return;
+                y = -8;
+                offset = -32;
             }
         }
 
@@ -248,7 +238,7 @@ fn move_left_right() {
             return;
         }
 
-        if is_solid(miner.tile + 2, &mut miner) {
+        if is_solid(miner.tile + offset + 2, &mut miner) {
             return;
         }
 
@@ -263,23 +253,11 @@ fn move_left_right() {
 
         if miner.air == 0 {
             if unsafe { Level_GetTileRamp((miner.tile + 31) as usize) } == TileType::RampL {
-                let y = -8;
-                let offset = -32;
-                if is_solid(miner.tile + offset - 1, &mut miner) {
-                    return;
-                }
-                miner.y += y;
-                miner.tile += offset;
-                return;
+                y = -8;
+                offset = -32;
             } else if unsafe { Level_GetTileRamp((miner.tile + 65) as usize) } == TileType::RampR {
-                let y = 8;
-                let offset = 32;
-                if is_solid(miner.tile + offset - 1, &mut miner) {
-                    return;
-                }
-                miner.y += y;
-                miner.tile += offset;
-                return;
+                y = 8;
+                offset = 32;
             }
         }
 
@@ -289,7 +267,7 @@ fn move_left_right() {
             return;
         }
 
-        if is_solid(miner.tile - 1, &mut miner) {
+        if is_solid(miner.tile + offset - 1, &mut miner) {
             return;
         }
 
@@ -297,6 +275,15 @@ fn move_left_right() {
         miner.tile -= 1;
         miner.frame = 3;
     }
+
+    // Apply vertical movement from ramps
+    if miner.y + y < 0 {
+        drop(miner);
+        Game_ChangeLevel(Direction::Above as i32);
+        return;
+    }
+    miner.y += y;
+    miner.tile += offset;
 }
 
 fn update_dir(convey_dir: i32) {
