@@ -5047,8 +5047,10 @@ fn level_get_tile_type(tile: usize) -> TileType {
             TileType::RampLC => TileType::ConveyR,
             TileType::RampRC => TileType::ConveyL,
             TileType::SolidFloor => {
-                let miner = GAME_STATE.miner.lock().unwrap();
-                if miner.air == 1 && miner.jump == 0 {
+                // Use atomic caches to avoid deadlocking
+                let air = GAME_STATE.miner_air.load(Ordering::Relaxed);
+                let jump = GAME_STATE.miner_jump.load(Ordering::Relaxed);
+                if air == 1 && jump == 0 {
                     TileType::Solid
                 } else {
                     TileType::Floor

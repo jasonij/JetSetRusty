@@ -161,6 +161,9 @@ pub struct GameState {
     // miner.rs via GAME_STATE.
     pub miner_attr_split: AtomicI32,
     pub miner_willy_rope: AtomicI32,
+    // Atomic caches for Level_GetTileType to avoid deadlocks
+    pub miner_air: AtomicI32,
+    pub miner_jump: AtomicI32,
     pub mode: AtomicU8,
     pub music: AtomicU8,
 
@@ -228,6 +231,8 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     miner: Mutex::new(Miner::default()),
     miner_attr_split: AtomicI32::new(6),
     miner_willy_rope: AtomicI32::new(0),
+    miner_air: AtomicI32::new(0),
+    miner_jump: AtomicI32::new(0),
     mode: AtomicU8::new(0),
     // C: `int gameMusic = MUS_PLAY;` — music on by default.
     music: AtomicU8::new(MUS_PLAY as u8),
@@ -798,11 +803,11 @@ pub extern "C" fn Game_GotItem() {
     }
 
     // audioPanX = minerWilly.x
-    // Read x and drop the guard immediately — holding it past here would
-    // self-deadlock when sync_rust_to_c() re-locks GAME_STATE.miner below.
-    let miner_x = game.miner.lock().unwrap().x;
-    unsafe {
-        crate::audio::audioPanX = miner_x;
+    // Use try_lock to avoid deadlock if we already hold the miner lock
+    if let Ok(miner_guard) = game.miner.try_lock() {
+        unsafe {
+            crate::audio::audioPanX = miner_guard.x;
+        }
     }
 
     // Audio_Sfx(SFX_ITEM)

@@ -146,6 +146,8 @@ pub extern "C" fn Miner_Restore() {
     miner.move_ = unsafe { MINER_STORE.move_ };
     miner.air = unsafe { MINER_STORE.air };
     miner.jump = unsafe { MINER_STORE.jump };
+    GAME_STATE.miner_air.store(miner.air, Ordering::Relaxed);
+    GAME_STATE.miner_jump.store(miner.jump, Ordering::Relaxed);
 }
 
 #[unsafe(no_mangle)]
@@ -195,6 +197,7 @@ fn is_solid(tile: i32, miner: &mut Miner) -> bool {
 
     if miner.air == 1 && miner.jump > 9 {
         miner.air = 0;
+        GAME_STATE.miner_air.store(0, Ordering::Relaxed);
     }
 
     false
@@ -334,6 +337,8 @@ fn update_dir(convey_dir: i32) {
     if System_IsKey(Key::Jump as i32) != 0 && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8 {
         miner.air = 1;
         miner.jump = 0;
+        GAME_STATE.miner_air.store(1, Ordering::Relaxed);
+        GAME_STATE.miner_jump.store(0, Ordering::Relaxed);
         if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) > 0 {
             GAME_STATE.miner_willy_rope.store(-16, Ordering::Relaxed);
             miner.y &= 120;
@@ -374,6 +379,7 @@ fn do_miner_ticker() {
 
             miner.air = 2;
             miner.move_ = 0;
+            GAME_STATE.miner_air.store(2, Ordering::Relaxed);
             return;
         }
 
@@ -386,9 +392,11 @@ fn do_miner_ticker() {
         miner.tile = tile;
         miner.align = jump_info.align;
         miner.jump += 1;
+        GAME_STATE.miner_jump.store(miner.jump, Ordering::Relaxed);
 
         if miner.jump == 18 {
             miner.air = 6;
+            GAME_STATE.miner_air.store(6, Ordering::Relaxed);
             return;
         }
 
@@ -433,6 +441,7 @@ fn do_miner_ticker() {
             }
 
             miner.air = 0;
+            GAME_STATE.miner_air.store(0, Ordering::Relaxed);
 
             if type0 == TileType::ConveyL || type1 == TileType::ConveyL {
                 convey_dir = C_LEFT;
@@ -456,13 +465,16 @@ fn do_miner_ticker() {
     miner.move_ = 0;
     if miner.air == 0 {
         miner.air = 2;
+        GAME_STATE.miner_air.store(2, Ordering::Relaxed);
         return;
     }
 
     miner.air += 1;
+    GAME_STATE.miner_air.store(miner.air, Ordering::Relaxed);
     if miner.air == 16 {
         // this affects the falling sound effect
         miner.air = 12;
+        GAME_STATE.miner_air.store(12, Ordering::Relaxed);
     }
 
     unsafe {
@@ -552,6 +564,7 @@ pub extern "C" fn Miner_Init() {
     miner.align = 4;
     miner.move_ = 0;
     miner.air = 0;
+    GAME_STATE.miner_air.store(0, Ordering::Relaxed);
     drop(miner);
 
     Miner_Save();
